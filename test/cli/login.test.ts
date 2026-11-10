@@ -130,7 +130,7 @@ const DEVICE = {
 // Signs in by device code, then answers the account and key calls in order.
 const stubLogin = (...app) =>
   stubAuth({ device: DEVICE, token: [json({ access_token: "at" }), ...app] });
-const loginEnv = () => ({ ...env, CN_CONFIG_HOME: tempDir() });
+const loginEnv = () => ({ ...env, HOME: tempDir(), CN_CONFIG_HOME: tempDir() });
 
 test("cn login saves the key minted for a single account", async () => {
   const calls = stubLogin(

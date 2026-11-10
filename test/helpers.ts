@@ -77,7 +77,7 @@ export function runCn(args, { env = {}, input } = {}) {
     input,
     env: {
       PATH: path.dirname(process.execPath),
-      HOME: os.homedir(),
+      HOME: tempDir("cn-home-"),
       CN_OFFLINE: "1",
       ...env,
     },
@@ -99,6 +99,7 @@ export function setup(extraEnv = {}) {
     config,
     env: {
       PATH: `${bin}:${nodeDir}`,
+      HOME: tempDir("cn-home-"),
       CN_CONFIG_HOME: config,
       CONCENTRATE_API_KEY: "sk-test",
       // Never read the developer's real Codex config.

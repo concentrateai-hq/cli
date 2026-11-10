@@ -9,23 +9,33 @@ import type { Environment } from "../types.js";
 
 const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
 
+export const sqliteBinary = (env: Environment) =>
+  which("sqlite3", env.PATH) || which("sqlite3", "/usr/bin:/bin");
+
 function databaseCommand(
   file: string,
   sql: string,
   env: Environment,
   write = false,
 ) {
-  const binary =
-    which("sqlite3", env.PATH) || which("sqlite3", "/usr/bin:/bin");
+  const binary = sqliteBinary(env);
   if (!binary) throw new CnError("Cursor setup requires sqlite3 on your PATH.");
-  const uri = pathToFileURL(file);
-  uri.searchParams.set("mode", write ? "rw" : "ro");
-  const result = spawnSync(binary, ["-json", uri.href], {
-    input: `.bail on\n.timeout 5000\n${sql}\n`,
-    encoding: "utf8",
-    timeout: 10000,
-    maxBuffer: 32 * 1024 * 1024,
-  });
+  const open = (mode: string) => {
+    const uri = pathToFileURL(file);
+    uri.searchParams.set("mode", mode);
+    return spawnSync(binary, ["-json", uri.href], {
+      input: `.bail on\n.timeout 5000\n${sql}\n`,
+      encoding: "utf8",
+      timeout: 10000,
+      maxBuffer: 32 * 1024 * 1024,
+    });
+  };
+  let result = open(write ? "rw" : "ro");
+  // After the app quits cleanly its database has no -wal/-shm files, and a
+  // read-only connection cannot create them. Reading through a normal
+  // connection creates them and changes nothing else.
+  if (!write && result.status !== 0 && /unable to open/.test(result.stderr))
+    result = open("rw");
   if (result.error || result.status !== 0)
     throw new CnError(
       "Could not read or update Cursor's settings database. Quit Cursor and retry. No partial database changes were committed.",
@@ -61,9 +71,10 @@ export function readDatabaseRows(
   env: Environment,
 ) {
   privateDatabase(file);
+  // sqlite3 takes seconds to escape a large text value as JSON; hex is instant.
   const output = databaseCommand(
     file,
-    `SELECT key, value FROM ItemTable WHERE key IN (${keys.map(literal).join(",")});`,
+    `SELECT key, hex(value) AS value FROM ItemTable WHERE key IN (${keys.map(literal).join(",")});`,
     env,
   );
   let rows: unknown;
@@ -85,7 +96,10 @@ export function readDatabaseRows(
   )
     throw new CnError("Cursor's saved settings have an unsupported format.");
   return new Map<string, string>(
-    rows.map((row: { key: string; value: string }) => [row.key, row.value]),
+    rows.map((row: { key: string; value: string }) => [
+      row.key,
+      Buffer.from(row.value, "hex").toString("utf8"),
+    ]),
   );
 }
 

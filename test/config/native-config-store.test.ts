@@ -200,12 +200,12 @@ test("Logout/Reset removes OpenCode's key file even if an unrelated setting was 
   expect(JSON.parse(fs.readFileSync(settings, "utf8")).theme).toBe("tokyo");
 });
 
-test("an unreadable Cursor database does not make cursorConfigured throw", () => {
+test("an unreadable Cursor database makes cursorConfigured throw instead of hiding a setup", () => {
   const { env } = toolFixture();
   const database = cursorDatabase(env);
   fs.mkdirSync(path.dirname(database), { recursive: true });
   fs.writeFileSync(database, "not a sqlite database");
-  expect(cursorConfigured(env)).toBe(false);
+  expect(() => cursorConfigured(env)).toThrow(/Could not read/);
 });
 
 test("TOML edits keep comments and unrelated layout, through Configure and an edited Reset", () => {

@@ -9,7 +9,11 @@ import { configDir } from "./settings.js";
 import { withSetupLock } from "./native-config-store.js";
 import { which } from "../executables.js";
 import { isRecord } from "../validation.js";
-import { readDatabaseRows, changeDatabaseRows } from "./sqlite-store.js";
+import {
+  readDatabaseRows,
+  changeDatabaseRows,
+  sqliteBinary,
+} from "./sqlite-store.js";
 import type { Environment, Model } from "../types.js";
 
 export const CURSOR_NOTICE =
@@ -192,15 +196,13 @@ function locked<T>(env: Environment, work: () => T) {
   );
 }
 export function cursorConfigured(env: Environment = process.env) {
-  if (!fs.existsSync(cursorDatabase(env))) return false;
-  // An unreadable database (no sqlite3, a symlinked path) must not block logout,
-  // key rotation or global Reset for people who never configured Cursor.
-  try {
-    return receipt(readRows(env))?.active === true;
-  } catch (error) {
-    if (error instanceof CnError) return false;
-    throw error;
-  }
+  const file = cursorDatabase(env);
+  // cn cannot have configured Cursor without its database and sqlite3. Any other
+  // read failure throws, so logout never reports a Cursor key copy as absent.
+  if (!fs.existsSync(file) || !sqliteBinary(env)) return false;
+  return (
+    receipt(readDatabaseRows(file, [CURSOR_RECEIPT_ROW], env))?.active === true
+  );
 }
 export function configureCursor(
   apiRoot: string,

@@ -70,6 +70,17 @@ export const toolConfigured = (
   id === "cursor"
     ? cursorConfigured(env)
     : hasNativeSetup(receiptFile(id, env));
+// For menus and status lines: settings cn cannot read show as not configured.
+export const toolConfiguredOrFalse = (
+  id: ConfigurableToolId,
+  env: Environment = process.env,
+) => {
+  try {
+    return toolConfigured(id, env);
+  } catch {
+    return false;
+  }
+};
 
 export function toolConfigPaths(id: HarnessId, env: Environment = process.env) {
   const root = home(env);
@@ -425,9 +436,9 @@ export function refreshConfiguredKey(env: Environment = process.env) {
   const saved = readStoredKey(env);
   // Each integration is refreshed even when another one fails.
   const problems: CnError[] = [];
-  if (saved && cursorConfigured(env)) {
+  if (saved) {
     try {
-      refreshCursorKey(saved, env);
+      if (cursorConfigured(env)) refreshCursorKey(saved, env);
     } catch {
       problems.push(
         new CnError(
