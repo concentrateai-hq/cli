@@ -13,7 +13,7 @@ import type { Environment } from "../types.js";
 import { ledger } from "../ui/layout.js";
 import { interactive, select } from "../ui/widgets.js";
 import { errorMessage, isRecord, record } from "../validation.js";
-import { runKey } from "./commands.js";
+import { askBaaOnce, runKey } from "./commands.js";
 
 const TRY_KEY = "Run cn key to paste a key instead.";
 
@@ -279,5 +279,6 @@ async function login(
   }
   const saved = minted.reused ? "kept your saved key" : "key saved";
   console.log(ledger("ok", "login", `${saved} for ${account.name}`));
+  await askBaaOnce(env);
   return 0;
 }

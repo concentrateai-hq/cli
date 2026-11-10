@@ -14,6 +14,7 @@ import { cleanText, isModelId, isOpenAiModel } from "./safe.js";
 import {
   configDir,
   DEFAULT_MODELS,
+  readBaa,
   readJson,
   writeJson,
 } from "./config/settings.js";
@@ -211,6 +212,7 @@ function model(fields: Record<string, unknown>): Model {
     output: positiveTokens(fields.output),
     image: fields.image === true,
     pdf: fields.pdf === true,
+    baa: fields.baa === true,
     released:
       typeof fields.released === "string" &&
       /^\d{4}-\d{2}-\d{2}$/.test(fields.released)
@@ -252,6 +254,7 @@ export function summarize(value: unknown): Model | null {
     output: raw.max_tokens,
     image: record(capabilities.image_input).supported === true,
     pdf: record(capabilities.pdf_input).supported === true,
+    baa: providers.some((p) => p.baa === true),
     released: releaseDate(raw.release_date),
     reasoning: record(capabilities.thinking).supported === true,
     reasoningSupport: record(capabilities.thinking).supported,
@@ -282,6 +285,7 @@ export function summarize(value: unknown): Model | null {
         output: p.max_output_tokens ?? summary.output,
         image: Object.values(record(support(p, "input").image)).some(Boolean),
         pdf: record(support(p, "input").file).pdf === true,
+        baa: p.baa === true,
         cost: costOf(p),
         reasoning,
         reasoningSupport: isRecord(support(p, "reasoning").effort)
@@ -326,6 +330,14 @@ async function fetchAllPages() {
   throw new Error("model catalog has more pages than expected");
 }
 
+// A BAA account sees only the models, and provider variants, covered by a BAA.
+function forAccount(models: Model[], env: Environment) {
+  if (!readBaa(env)) return models;
+  return models
+    .filter((m) => m.baa)
+    .map((m) => ({ ...m, variants: m.variants?.filter((v) => v.baa) }));
+}
+
 function readCache(env: Environment) {
   let cached: Record<string, unknown> = {};
   try {
@@ -336,13 +348,16 @@ function readCache(env: Environment) {
     cached = {};
   }
   // A cache written by another format version is not trustworthy, online or off.
-  // Versions 3-5 lack fields added since (prices, PDF input, release dates), so
-  // they are a fallback but never fresh.
-  const current = cached.version === 6;
-  const usable = current || [3, 4, 5].includes(Number(cached.version));
+  // Versions 3-6 lack fields added since (prices, PDF input, release dates, BAA),
+  // so they are a fallback but never fresh.
+  const current = cached.version === 7;
+  const usable = current || [3, 4, 5, 6].includes(Number(cached.version));
   const saved =
     usable && Array.isArray(cached.models)
-      ? cached.models.map(fromCache).filter((m): m is Model => m !== null)
+      ? forAccount(
+          cached.models.map(fromCache).filter((m): m is Model => m !== null),
+          env,
+        )
       : null;
   return { cached, current, saved };
 }
@@ -378,11 +393,11 @@ export async function fetchCatalog({
   }
   // The list is good even when it cannot be saved (read-only or full disk).
   try {
-    writeJson(file, { version: 6, fetchedAt: Date.now() / 1000, models });
+    writeJson(file, { version: 7, fetchedAt: Date.now() / 1000, models });
   } catch {
     /* The next run fetches again. */
   }
-  return { models, source: "live" };
+  return { models: forAccount(models, env), source: "live" };
 }
 
 export function routingModels(models: Model[]) {

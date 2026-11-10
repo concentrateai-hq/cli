@@ -539,3 +539,54 @@ console.log(JSON.stringify({ args, catalog }));`,
     expect(actual.args.includes("gpt-m1")).toBe(harness !== "opencode");
   },
 );
+
+const baaCatalog = [
+  RAW("both", {
+    providers: {
+      covered: { provider_slug: "covered", baa: true },
+      open: { provider_slug: "open", baa: false },
+    },
+  }),
+  RAW("none", { providers: { open: { provider_slug: "open", baa: false } } }),
+];
+
+const summarizedBaa = () => baaCatalog.map(summarize);
+
+test("a model is BAA-covered when any provider is, and each variant keeps its own flag", () => {
+  const [both, none] = summarizedBaa();
+  expect(both).toMatchObject({
+    baa: true,
+    variants: [
+      { id: "covered/both", baa: true },
+      { id: "open/both", baa: false },
+    ],
+  });
+  expect(none.baa).toBe(false);
+});
+
+const shownAll = [
+  { id: "both", variants: [{ id: "covered/both" }, { id: "open/both" }] },
+  { id: "none" },
+];
+test.each([
+  [{ baa: true }, [{ id: "both", variants: [{ id: "covered/both" }] }]],
+  [{ baa: false }, shownAll],
+  [{}, shownAll],
+])(
+  "with config %j the catalog shows only what the account may use",
+  async (config, shown) => {
+    const dir = tempDir();
+    writeJson(path.join(dir, "config.json"), config);
+    vi.stubGlobal("fetch", async () =>
+      json({ data: baaCatalog, has_more: false }),
+    );
+    const env = { CN_CONFIG_HOME: dir };
+    const live = await fetchCatalog({ env });
+    const cached = await fetchCatalog({ env: { ...env, CN_OFFLINE: "1" } });
+    expect(live.models).toMatchObject(shown);
+    expect(live.models).toHaveLength(shown.length);
+    expect(live.models[0].variants).toHaveLength(shown[0].variants.length);
+    expect(cached.models).toMatchObject(shown);
+    expect(cached.models).toHaveLength(shown.length);
+  },
+);

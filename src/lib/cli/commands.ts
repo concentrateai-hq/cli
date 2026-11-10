@@ -41,6 +41,8 @@ import {
   HARNESS_IDS,
   readPreferences,
   newestInTier,
+  readBaa,
+  writeBaa,
   CLAUDE_SONNET,
   DEEPSEEK_FLASH,
   environmentKey,
@@ -58,7 +60,7 @@ import { modelItem, modelLegend, modelRight } from "../ui/models.js";
 import { caps, pad, paint } from "../ui/term.js";
 import { glyphs } from "../ui/theme.js";
 import { interactive, password, select, spinner } from "../ui/widgets.js";
-import { updateNotice } from "./update.js";
+import { refreshConfiguredTools, updateNotice } from "./update.js";
 import { version } from "../version.js";
 
 // ---- helpers shared by commands -------------------------------------------------
@@ -300,6 +302,7 @@ export async function runSetup(
   } else {
     console.log(ledger("warn", "key", "saved without a live check", c));
   }
+  await askBaaOnce(env);
   const models = readPreferences(env);
   if (customize) {
     let catalog: Model[] = [];
@@ -370,6 +373,65 @@ export async function runKey(
       verify ? "key stored" : "key stored without a live check",
     ),
   );
+  await askBaaOnce(env);
+  return 0;
+}
+
+// Asked once, the first time cn has a key; cn baa or Settings changes it later.
+export async function askBaaOnce(env: Environment = process.env) {
+  if (readBaa(env) === null) await askBaa(env);
+}
+
+export async function askBaa(env: Environment = process.env) {
+  if (!interactive(env)) return;
+  const choice = await select({
+    title: "Does your organization have a BAA with Concentrate AI?",
+    initial: readBaa(env) ? "yes" : "no",
+    items: [
+      { value: "no", label: "No", note: "Show every model" },
+      { value: "yes", label: "Yes", note: "Show only BAA-covered models" },
+    ],
+    hints: [
+      ["↑↓", "move"],
+      ["↵", "choose"],
+      ["esc", "keep current"],
+    ],
+  });
+  // Esc on the first ask counts as No, so it is still asked only once.
+  if (choice.cancel) {
+    if (readBaa(env) === null) writeBaa(false, env);
+    return;
+  }
+  await setBaa(choice.value === "yes", env);
+}
+
+async function setBaa(baa: boolean, env: Environment) {
+  const changed = baa !== Boolean(readBaa(env));
+  writeBaa(baa, env);
+  console.log(
+    ledger(
+      "ok",
+      "BAA",
+      baa
+        ? "on, only BAA-covered models are shown"
+        : "off, every model is shown",
+    ),
+  );
+  if (changed) await refreshConfiguredTools(env);
+}
+
+/** cn baa [on|off]: show or change whether only BAA-covered models are shown. */
+export async function runBaa(
+  { value }: { value?: string },
+  env: Environment = process.env,
+) {
+  if (value === "on" || value === "off") {
+    await setBaa(value === "on", env);
+    return 0;
+  }
+  if (value !== undefined) throw new CnError("Use cn baa on or cn baa off.", 2);
+  if (interactive(env)) await askBaa(env);
+  else console.log(ledger("info", "BAA", readBaa(env) ? "on" : "off"));
   return 0;
 }
 
@@ -496,6 +558,13 @@ export function showConfig(env: Environment = process.env) {
   console.log(ledger("mute", "config", configDir(env)));
   console.log(ledger(key ? "ok" : "bad", "api key", source));
   console.log(ledger("info", "routing", "automatic"));
+  console.log(
+    ledger(
+      "info",
+      "BAA",
+      readBaa(env) ? "on (BAA-covered models only)" : "off",
+    ),
+  );
   for (const [id, model] of Object.entries(readPreferences(env))) {
     console.log(
       ledger(
