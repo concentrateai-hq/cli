@@ -13,6 +13,8 @@ import type {
   TerminalCapabilities,
 } from "../types.js";
 import {
+  askBaa,
+  askBaaOnce,
   browseModels,
   runDoctor,
   runSetup,
@@ -25,6 +27,7 @@ import { getHarness, listHarnesses } from "../harnesses/registry.js";
 import { validateKey } from "../catalog.js";
 import {
   needsSetup,
+  readBaa,
   readPreferences,
   resolveKeyOrNull,
   writeKey,
@@ -339,6 +342,15 @@ export async function runSettings(env: Environment = process.env) {
           { group: "account" },
           { value: "key", label: "API key", note: "Save or replace your key" },
           {
+            value: "baa",
+            label: "BAA models",
+            note: readBaa(env)
+              ? "On · BAA-covered models only"
+              : "Off · every model",
+            about:
+              "Choose Yes if your organization has a BAA with Concentrate AI. Model lists then show only models covered by it.",
+          },
+          {
             value: "config",
             label: "Configuration",
             note: "View saved defaults and key source",
@@ -354,12 +366,13 @@ export async function runSettings(env: Environment = process.env) {
     );
     if (choice.cancel || choice.value === "back") return 0;
     initial = choice.value;
-    if (choice.value !== "key" && choice.value !== "config") {
+    if (!["key", "config", "baa"].includes(choice.value)) {
       await toolSettings(choice.value as ConfigurableToolId, env);
       continue;
     }
     await action(() => {
       if (choice.value === "key") return runKey({}, env);
+      if (choice.value === "baa") return askBaa(env);
       return showConfig(env);
     }, env);
   }
@@ -499,6 +512,7 @@ async function launcher(
           if ("key" in result) {
             writeKey(result.key, env);
             refreshConfiguredKey(env);
+            await askBaaOnce(env);
           }
         } catch (error) {
           clearScreen("Unable to continue");

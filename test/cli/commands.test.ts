@@ -195,3 +195,26 @@ test("keeping the default at the model prompt saves nothing, so the tool follows
   ]);
   expect(runCn(["config"], { env }).stdout).toMatch(/Pi\s+deepseek-v5-flash/);
 });
+
+test.each([
+  ["on", true, 1],
+  ["off", false, 2],
+])(
+  "cn baa %s saves the answer and filters the model list",
+  (value, baa, count) => {
+    const { config, env } = setup();
+    writeCatalog(config, [
+      { id: "covered", name: "Covered", baa: true },
+      { id: "uncovered", name: "Uncovered", baa: false },
+    ]);
+    expect(runCn(["baa", value], { env }).status).toBe(0);
+    expect(
+      JSON.parse(fs.readFileSync(path.join(config, "config.json"), "utf8")),
+    ).toMatchObject({ baa });
+    expect(runCn(["models"], { env }).stdout).toMatch(`${count} models`);
+  },
+);
+
+test("cn baa rejects anything but on or off", () => {
+  expect(runCn(["baa", "maybe"], setup()).status).toBe(2);
+});
