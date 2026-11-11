@@ -38,7 +38,7 @@ import {
   configureTool,
   refreshConfiguredKey,
   resetTool,
-  toolConfigured,
+  toolConfiguredOrFalse,
 } from "../harnesses/tool-config.js";
 import { CnError } from "../errors.js";
 import { errorMessage } from "../validation.js";
@@ -224,7 +224,7 @@ async function integrationPicker(
           ...listConfigurableTools().map((tool) => ({
             value: tool.id,
             label: tool.label,
-            note: toolConfigured(tool.id, env)
+            note: toolConfiguredOrFalse(tool.id, env)
               ? operation === "configure"
                 ? "Configured · refresh saved settings"
                 : "Remove this tool’s Concentrate setup"
@@ -264,7 +264,7 @@ async function toolSettings(
   const tool = configurableTool(target);
   let initial = target === "cursor" ? "configure" : "model";
   for (;;) {
-    const configured = toolConfigured(target, env);
+    const configured = toolConfiguredOrFalse(target, env);
     const choice = await select(
       {
         title: `${tool.label} settings`,
@@ -332,7 +332,7 @@ export async function runSettings(env: Environment = process.env) {
           ...listConfigurableTools().map((tool) => ({
             value: tool.id,
             label: tool.label,
-            note: `${tool.id === "cursor" ? "Choose models inside Cursor" : preferences[tool.id]}${toolConfigured(tool.id, env) ? " · configured" : ""}`,
+            note: `${tool.id === "cursor" ? "Choose models inside Cursor" : preferences[tool.id]}${toolConfiguredOrFalse(tool.id, env) ? " · configured" : ""}`,
             about:
               tool.id === "cursor"
                 ? CURSOR_NOTICE

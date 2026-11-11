@@ -485,9 +485,17 @@ export async function runReset(
 ) {
   const c = caps();
   const targets = resetTargets(env, { sessions });
-  const configured = listConfigurableTools().filter((tool) =>
-    toolConfigured(tool.id, env),
-  );
+  // A tool whose settings cannot be read is reported, not allowed to stop the reset.
+  const configured = listConfigurableTools().filter((tool) => {
+    try {
+      return toolConfigured(tool.id, env);
+    } catch (error) {
+      console.log(
+        ledger("warn", tool.label, `not checked: ${errorMessage(error)}`, c),
+      );
+      return false;
+    }
+  });
   if (!targets.length && !configured.length) {
     console.log(ledger("mute", "reset", "nothing saved, already fresh", c));
     return 0;
