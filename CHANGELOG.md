@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.5 (2026-11-12)
 
 - **Requires Node.js 22.13 or newer.** The installer, `cn update`, and `cn`
   itself stop with a clear message on older Node; install a current Node.js
@@ -15,6 +15,14 @@
   you pick your personal account or an organization, and saves an API key for
   it: the key this computer already has there, or a new one named after your
   computer.
+- `cn baa` asks once whether your account has a BAA and, if so, shows only
+  BAA-covered models.
+- `cn configure copilot` sets up the GitHub Copilot desktop app (macOS) with a
+  "Concentrate AI" provider. `cn reset copilot` removes it.
+- `cn refresh` and `cn update` now refresh Cursor and Copilot too.
+- Cursor setup leaves out Claude models for now, since Cursor can't cache them.
+- Checking Cursor's settings no longer freezes `cn`, and setup works after
+  Cursor is fully quit.
 
 ## 0.1.4 (2026-11-02)
 
