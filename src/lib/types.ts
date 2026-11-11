@@ -26,6 +26,8 @@ export interface Model {
   chat_candidate: boolean;
   image: boolean;
   pdf?: boolean;
+  // Covered by a Business Associate Agreement on at least one provider.
+  baa: boolean;
   // Release date as YYYY-MM-DD.
   released?: string | null;
   reasoning: boolean;

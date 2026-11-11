@@ -38,7 +38,7 @@ function rig({ catalog = true } = {}) {
   const codexHome = env.CODEX_HOME;
   if (catalog)
     writeJson(path.join(config, "catalog.json"), {
-      version: 6,
+      version: 7,
       fetchedAt: Date.now() / 1000,
       models: CATALOG,
     });

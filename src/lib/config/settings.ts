@@ -126,13 +126,25 @@ export function readPreferences(env: Environment = process.env) {
     throw new CnError("models must be an object in config.json");
   }
   const cached = cachedModels(env);
+  // With BAA on, the cached list holds only covered models. A saved choice
+  // outside it is skipped, not erased, so turning BAA off brings it back.
+  const covered =
+    data.baa === true && cached.length
+      ? new Set(
+          cached.flatMap((m) => [m.id, ...(m.variants ?? []).map((v) => v.id)]),
+        )
+      : null;
   const models = { ...DEFAULT_MODELS };
   for (const id of HARNESS_IDS) {
     models[id] = newestInTier(TIERS[id], cached) ?? models[id];
     const value =
       typeof configured[id] === "string" ? configured[id].trim() : "";
     // Codex is limited to OpenAI models; anything else falls back to the default.
-    if (isModelId(value) && (id !== "codex" || isOpenAiModel(value)))
+    if (
+      isModelId(value) &&
+      (id !== "codex" || isOpenAiModel(value)) &&
+      (!covered || covered.has(value))
+    )
       models[id] = value;
   }
   return models;
@@ -160,6 +172,19 @@ export function writePreferences(
     private: false,
   });
   writeJson(file, { ...saved, models: { ...record(saved.models), ...models } });
+}
+
+// Whether this account has a BAA, so only BAA-covered models are shown.
+// null until the user has answered.
+export function readBaa(env: Environment = process.env) {
+  const file = path.join(configDir(env), "config.json");
+  const { baa } = readJson(file, { private: false });
+  return typeof baa === "boolean" ? baa : null;
+}
+
+export function writeBaa(baa: boolean, env: Environment = process.env) {
+  const file = path.join(configDir(env), "config.json");
+  writeJson(file, { ...readJson(file, { private: false }), baa });
 }
 
 // For the paths that replace a key: a damaged saved key is treated as absent so

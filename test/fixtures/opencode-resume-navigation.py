@@ -13,6 +13,9 @@ import time
 with tempfile.TemporaryDirectory(prefix='cn-opencode-menu-') as root:
     binary = os.path.join(root, 'bin')
     os.makedirs(binary)
+    os.makedirs(os.path.join(root, 'cn'))
+    with open(os.path.join(root, 'cn', 'config.json'), 'w') as file:
+        file.write('{"baa": false}')  # answered, so startup skips the BAA question
     tool = os.path.join(binary, 'opencode')
     with open(tool, 'w') as f:
         f.write('''#!/bin/sh
