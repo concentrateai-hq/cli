@@ -22,6 +22,9 @@ for key, code in ((b'\x1b', 0), (b'\x03', 130)):
             file.write('PRIVATE_HISTORY_NOT_FOR_THE_PICKER\n')
         binary = os.path.join(root, 'tool-bin')
         os.makedirs(binary)
+        os.makedirs(os.path.join(root, 'cn'))
+        with open(os.path.join(root, 'cn', 'config.json'), 'w') as file:
+            file.write('{"baa": false}')  # answered, so startup skips the BAA question
         with open(os.path.join(binary, 'codex'), 'w') as file:
             file.write('#!/bin/sh\necho AGENT_WAS_LAUNCHED\n')
         os.chmod(os.path.join(binary, 'codex'), 0o755)

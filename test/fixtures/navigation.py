@@ -16,6 +16,8 @@ import time
 master, slave = pty.openpty()
 fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 100, 0, 0))
 with tempfile.TemporaryDirectory(prefix='cn-navigation-') as directory:
+    with open(os.path.join(directory, 'config.json'), 'w') as file:
+        file.write('{"baa": false}')  # answered, so startup goes straight to the menu
     env = {**os.environ, 'CN_CONFIG_HOME': directory, 'CN_OFFLINE': '1',
            'CN_NO_MOTION': '1', 'NO_COLOR': '1', 'TERM': 'xterm-256color',
            'CN_NO_UPDATE_CHECK': '1', 'CONCENTRATE_API_KEY': 'sk-navigation-test', 'PATH': directory}
@@ -81,7 +83,7 @@ with tempfile.TemporaryDirectory(prefix='cn-navigation-') as directory:
         assert 'sk-navigation-test' not in transcript, 'Key leaked'
         press('\r')
         expect('TOOLS')
-        press('\x1b[F\x1b[A\x1b[A\r')  # API key prompt
+        press('\x1b[F\x1b[A\x1b[A\x1b[A\r')  # API key prompt
         expect('Enter saves CONCENTRATE_API_KEY')
         press('\x1b')  # Esc backs out to Settings instead of ignoring it or quitting cn
         expect('TOOLS')
@@ -156,6 +158,8 @@ for termination in ('ctrl-c', 'sigterm'):
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 80, 0, 0))
     with tempfile.TemporaryDirectory(prefix='cn-exit-') as directory:
+        with open(os.path.join(directory, 'config.json'), 'w') as file:
+            file.write('{"baa": false}')
         env = {**os.environ, 'CN_CONFIG_HOME': directory, 'CN_OFFLINE': '1',
                'CN_NO_MOTION': '1', 'NO_COLOR': '1', 'TERM': 'xterm-256color',
                'CN_NO_UPDATE_CHECK': '1', 'CONCENTRATE_API_KEY': 'sk-exit-test'}

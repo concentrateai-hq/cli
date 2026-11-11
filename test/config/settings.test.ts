@@ -10,6 +10,7 @@ import {
   resolveKey,
   writeKey,
   writePreferences,
+  writeBaa,
   needsSetup,
   environmentKey,
   configDir,
@@ -78,6 +79,19 @@ test("preferences default, persist, and ignore blank values", () => {
     mode: 0o600,
   });
   expect(readPreferences(envFor(dir)).pi).toBe(DEFAULT_MODELS.pi);
+});
+
+test("with BAA on, a saved model that is not covered falls back to a covered default", () => {
+  const dir = tempDir();
+  writeCatalog(dir, [
+    { id: "claude-sonnet-5-5", released: "2026-09-28", baa: true },
+    { id: "claude-fable-5-1", baa: false },
+  ]);
+  writePreferences({ claude: "claude-fable-5-1" }, envFor(dir));
+  writeBaa(true, envFor(dir));
+  expect(readPreferences(envFor(dir)).claude).toBe("claude-sonnet-5-5");
+  writeBaa(false, envFor(dir));
+  expect(readPreferences(envFor(dir)).claude).toBe("claude-fable-5-1");
 });
 
 const tiers = [

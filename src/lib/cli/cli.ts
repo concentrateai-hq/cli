@@ -2,7 +2,9 @@ import { isConfigurableTool } from "../harnesses/configurable-tools.js";
 import { CURSOR_NOTICE } from "../config/cursor-config.js";
 import type { Environment, HarnessId } from "../types.js";
 import {
+  askBaaOnce,
   offerCodexResume,
+  runBaa,
   runDoctor,
   runKey,
   runLogout,
@@ -47,6 +49,7 @@ Usage:
   cn login [--device]                         Sign in with your browser and save a new API key
   cn key [--no-verify]                        Replace the saved API key
   cn logout                                   Remove the saved API key
+  cn baa [on|off]                             Show only models covered by a BAA
   cn reset [--yes] [--sessions]               Clear everything cn saved and start fresh
   cn model [<tool> [<model-id>]]              Show or change default models
   cn models [<tool>] [--search <text>] [--refresh] [--limit <n>]
@@ -163,6 +166,7 @@ async function dispatch(argv: string[], env: Environment) {
   }
   if (!command && interactive(env)) {
     if (await offerUpdate(env)) return 0;
+    if (!needsSetup(env)) await askBaaOnce(env);
     return runLauncher(env);
   }
   if (
@@ -193,6 +197,7 @@ async function dispatch(argv: string[], env: Environment) {
       await runSetup({}, env);
       console.log();
     }
+    if (!needsSetup(env)) await askBaaOnce(env);
     if (command === "codex" && which(adapter.binary, env.PATH))
       await offerCodexResume(env);
     return launch(command, parseHarnessLaunchArgs(command, rest), env);
@@ -264,6 +269,11 @@ async function dispatch(argv: string[], env: Environment) {
         { yes: Boolean(flags.yes), sessions: Boolean(flags.sessions) },
         env,
       );
+    }
+    case "baa": {
+      const { positionals } = parseFlags(rest);
+      if (positionals.length > 1) throw usageError("Use cn baa [on|off]");
+      return runBaa({ value: positionals[0] }, env);
     }
     case "logout":
       return runLogout(env);
