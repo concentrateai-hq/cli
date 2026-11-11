@@ -1,7 +1,8 @@
 /** Shared contracts between the catalog, commands, and harness adapters. */
 export type Environment = NodeJS.ProcessEnv;
 export type HarnessId = "claude" | "codex" | "opencode" | "pi";
-export type ConfigurableToolId = HarnessId | "cursor";
+export type ConfigurableToolId = HarnessId | DesktopAppId;
+export type DesktopAppId = "cursor" | "copilot";
 export type Preferences = Record<HarnessId, string>;
 export type Effort =
   "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";

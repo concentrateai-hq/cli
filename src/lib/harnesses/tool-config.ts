@@ -5,12 +5,18 @@ import {
   refreshCursorKey,
 } from "../config/cursor-config.js";
 import {
+  configureCopilot,
+  copilotConfigured,
+  refreshCopilotKey,
+  resetCopilot,
+} from "../config/copilot-config.js";
+import {
   appHeaders,
   codexHeaderConfig,
   configDocument,
   openCodeHeaders,
 } from "./app-headers.js";
-import { record } from "../validation.js";
+import { errorMessage, record } from "../validation.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -69,7 +75,9 @@ export const toolConfigured = (
 ) =>
   id === "cursor"
     ? cursorConfigured(env)
-    : hasNativeSetup(receiptFile(id, env));
+    : id === "copilot"
+      ? copilotConfigured(env)
+      : hasNativeSetup(receiptFile(id, env));
 // For menus and status lines: settings cn cannot read show as not configured.
 export const toolConfiguredOrFalse = (
   id: ConfigurableToolId,
@@ -167,14 +175,19 @@ export async function configureTool(
   id: ConfigurableToolId,
   env: Environment = process.env,
 ) {
-  if (id === "cursor") {
+  if (id === "cursor" || id === "copilot") {
     const key = readStoredKey(env);
     if (!key)
       throw new CnError(
-        "Save your Concentrate API key with cn key before configuring Cursor.",
+        `Save your Concentrate API key with cn key before configuring ${id === "cursor" ? "Cursor" : "the GitHub Copilot app"}.`,
       );
     const { models } = await fetchCatalog({ env });
-    return configureCursor(API_ROOT, key, models, env);
+    return (id === "cursor" ? configureCursor : configureCopilot)(
+      API_ROOT,
+      key,
+      models,
+      env,
+    );
   }
   const adapter = getHarness(id);
   const executable = which(adapter.binary, env.PATH);
@@ -426,6 +439,7 @@ export function resetTool(
   env: Environment = process.env,
 ) {
   if (id === "cursor") return resetCursor(env);
+  if (id === "copilot") return resetCopilot(env);
   const files = toolConfigPaths(id, env);
   return withSetupLock(toolSetupDir(id, env), () =>
     resetNativeSetup(receiptFile(id, env), Object.values(files)),
@@ -443,6 +457,17 @@ export function refreshConfiguredKey(env: Environment = process.env) {
       problems.push(
         new CnError(
           "Your cn API key was saved, but Cursor's key could not be refreshed. Quit Cursor and run cn configure cursor; if it reports edited settings, Reset Cursor first.",
+        ),
+      );
+    }
+  }
+  if (saved && copilotConfigured(env)) {
+    try {
+      refreshCopilotKey(API_ROOT, saved, env);
+    } catch (error) {
+      problems.push(
+        new CnError(
+          `Your cn API key was saved, but the GitHub Copilot app's key was not refreshed. ${errorMessage(error)}`,
         ),
       );
     }

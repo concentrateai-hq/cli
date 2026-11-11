@@ -12,13 +12,14 @@ and the coding tools you want to use installed on your `PATH`.
 
 ## Supported tools
 
-| Tool             | Support                                              |
-| ---------------- | ---------------------------------------------------- |
-| Claude Code      | Works                                                |
-| OpenCode         | Works                                                |
-| Pi               | Works                                                |
-| Codex            | OpenAI models only for now. More models coming soon. |
-| Cursor (desktop) | Work in progress. Set up with `cn configure cursor`. |
+| Tool                   | Support                                               |
+| ---------------------- | ----------------------------------------------------- |
+| Claude Code            | Works                                                 |
+| OpenCode               | Works                                                 |
+| Pi                     | Works                                                 |
+| Codex                  | OpenAI models only for now. More models coming soon.  |
+| Cursor (desktop)       | Work in progress. Set up with `cn configure cursor`.  |
+| GitHub Copilot (app)   | Works (macOS). Set up with `cn configure copilot`.    |
 
 ## Install
 
@@ -108,10 +109,28 @@ while you run through `cn`.
 
 Work in progress: expect changes.
 
-- `cn configure cursor` sets up the Cursor desktop editor. Quit Cursor first.
+- `cn configure cursor` sets up the Cursor desktop editor. If Cursor is open,
+  cn asks you to quit it; reopen it afterward.
+- Claude models are not added for now: Cursor can only use Chat Completions,
+  where Claude isn't cached yet, so long chats would cost much more. Use
+  `cn claude` for Claude models.
 - Cursor stores your key and sends requests through Cursor's servers. Tab
   completions keep using Cursor's own models.
 - This sets up the editor, not the Cursor command-line tool.
+
+## GitHub Copilot app
+
+macOS only for now.
+
+- `cn configure copilot` adds a "Concentrate AI" provider with the Concentrate
+  models that support tool calls to the GitHub Copilot desktop app. If the app is
+  open, cn asks you to quit it. Reopen it afterward and pick a model under
+  Concentrate AI.
+- Claude models are cached. Other models use Chat Completions for now, so GPT
+  can be a little slower on long tasks.
+- The app keeps your key in its local settings database. `cn key` updates it,
+  and `cn reset copilot` or `cn logout` removes the provider. Providers you added
+  yourself are left alone.
 
 ## Models
 

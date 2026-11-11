@@ -7,4 +7,7 @@ export class CnError extends Error {
   }
 }
 
+// A desktop app is running, so its settings were left alone.
+export class AppOpenError extends CnError {}
+
 export const EXIT = Object.freeze({ FAILURE: 1, USAGE: 2, NOT_FOUND: 127 });

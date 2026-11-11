@@ -1,10 +1,12 @@
 import {
   configurableTool,
+  DESKTOP_APPS,
+  isDesktopApp,
   listConfigurableTools,
 } from "../harnesses/configurable-tools.js";
-import { CURSOR_NOTICE } from "../config/cursor-config.js";
 import type {
   ConfigurableToolId,
+  DesktopAppId,
   Environment,
   HarnessId,
   MenuItem,
@@ -125,14 +127,13 @@ export function menuItems(env: Environment, c = caps()) {
           "Pick a saved session and continue it through Concentrate on the tool's default model. Requests are billed at API rates.",
       },
       { group: "desktop" },
-      {
-        value: "desktop:cursor",
-        label: "cursor",
-        note: "Cursor desktop",
+      ...Object.values(DESKTOP_APPS).map((app) => ({
+        value: `desktop:${app.id}`,
+        label: app.id,
+        note: app.label,
         meta: "Configure / Reset",
-        about:
-          "Connect Cursor desktop to Concentrate or remove its setup. Open Cursor normally afterward. Quit Cursor before changing its configuration.",
-      },
+        about: `Connect ${app.label} to Concentrate or remove its setup. Open it normally afterward. Quit it before changing its configuration.`,
+      })),
       { group: "manage" },
       ...MANAGE,
     ],
@@ -234,8 +235,8 @@ async function integrationPicker(
         detail: (item) =>
           item.value === "back"
             ? ["Return to the home menu."]
-            : item.value === "cursor"
-              ? [CURSOR_NOTICE]
+            : item.value && isDesktopApp(item.value)
+              ? [DESKTOP_APPS[item.value].notice]
               : [
                   operation === "configure"
                     ? "Saves Concentrate connection and model settings. The tool’s normal command will use your saved Concentrate key. Restart the tool afterward."
@@ -259,7 +260,8 @@ async function toolSettings(
   backNote = "Return to Settings",
 ) {
   const tool = configurableTool(target);
-  let initial = target === "cursor" ? "configure" : "model";
+  const desktop = isDesktopApp(target);
+  let initial = desktop ? "configure" : "model";
   for (;;) {
     const configured = toolConfiguredOrFalse(target, env);
     const choice = await select(
@@ -267,7 +269,7 @@ async function toolSettings(
         title: `${tool.label} settings`,
         initial,
         items: [
-          ...(target === "cursor"
+          ...(desktop
             ? []
             : [
                 {
@@ -293,8 +295,8 @@ async function toolSettings(
           { value: "back", label: "Back", note: backNote },
         ],
         detail: (item) => [
-          target === "cursor"
-            ? CURSOR_NOTICE
+          desktop
+            ? DESKTOP_APPS[target].notice
             : item.value === "configure"
               ? `Saves Concentrate connection and model settings so this tool’s normal command uses your saved Concentrate key. Restart the tool afterward.`
               : item.value === "reset"
@@ -308,7 +310,7 @@ async function toolSettings(
     initial = choice.value;
     await action(
       () =>
-        choice.value === "model" && target !== "cursor"
+        choice.value === "model" && !desktop
           ? runModel({ target }, env)
           : integrateTool(choice.value as IntegrationAction, target, env),
       env,
@@ -329,11 +331,10 @@ export async function runSettings(env: Environment = process.env) {
           ...listConfigurableTools().map((tool) => ({
             value: tool.id,
             label: tool.label,
-            note: `${tool.id === "cursor" ? "Choose models inside Cursor" : preferences[tool.id]}${toolConfiguredOrFalse(tool.id, env) ? " · configured" : ""}`,
-            about:
-              tool.id === "cursor"
-                ? CURSOR_NOTICE
-                : `Choose a default model, connect this tool to Concentrate, or remove its Concentrate setup for ${tool.label}.`,
+            note: `${isDesktopApp(tool.id) ? "Choose models inside the app" : preferences[tool.id]}${toolConfiguredOrFalse(tool.id, env) ? " · configured" : ""}`,
+            about: isDesktopApp(tool.id)
+              ? DESKTOP_APPS[tool.id].notice
+              : `Choose a default model, connect this tool to Concentrate, or remove its Concentrate setup for ${tool.label}.`,
           })),
           { group: "account" },
           { value: "key", label: "API key", note: "Save or replace your key" },
@@ -544,8 +545,12 @@ async function launcher(
             env,
           );
       } else if (choice.value === "resume") await resumePicker(env, screen);
-      else if (choice.value === "desktop:cursor")
-        await toolSettings("cursor", env, "Return to home");
+      else if (choice.value.startsWith("desktop:"))
+        await toolSettings(
+          choice.value.slice(8) as DesktopAppId,
+          env,
+          "Return to home",
+        );
       else if (choice.value === "configure" || choice.value === "reset")
         await integrationPicker(choice.value, env);
       else if (choice.value === "settings") await runSettings(env);

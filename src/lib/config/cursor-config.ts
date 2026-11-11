@@ -3,11 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { spawnSync } from "node:child_process";
 import { CnError } from "../errors.js";
 import { configDir } from "./settings.js";
 import { withSetupLock } from "./native-config-store.js";
-import { which } from "../executables.js";
+import { requireAppClosed } from "../executables.js";
 import { isRecord } from "../validation.js";
 import {
   readDatabaseRows,
@@ -65,28 +64,6 @@ export function cursorDatabase(
             "Cursor",
           );
   return path.join(root, "User", "globalStorage", "state.vscdb");
-}
-function requireClosed(env: Environment) {
-  if (process.platform === "win32")
-    throw new CnError("Cursor setup on Windows is not supported by cn yet.");
-  const pgrep = which("pgrep", env.PATH) || which("pgrep", "/usr/bin:/bin");
-  if (!pgrep)
-    throw new CnError(
-      "Cannot check whether Cursor is closed: pgrep is required for Cursor setup.",
-    );
-  const result = spawnSync(
-    pgrep,
-    ["-x", process.platform === "darwin" ? "Cursor" : "cursor"],
-    { encoding: "utf8", timeout: 5000 },
-  );
-  if (result.status === 0)
-    throw new CnError(
-      "Quit Cursor before configuring or resetting it, then retry. Cursor can overwrite settings while it is running.",
-    );
-  if (result.error || result.status !== 1)
-    throw new CnError(
-      "Could not confirm that Cursor is closed. Quit Cursor and retry.",
-    );
 }
 function readRows(env: Environment) {
   const file = cursorDatabase(env);
@@ -190,7 +167,15 @@ function locked<T>(env: Environment, work: () => T) {
   return withSetupLock(
     path.join(configDir(env), "tool-setups", "cursor"),
     () => {
-      requireClosed(env);
+      requireAppClosed(
+        "Cursor",
+        process.platform === "win32"
+          ? undefined
+          : process.platform === "darwin"
+            ? "Cursor"
+            : "cursor",
+        env,
+      );
       return work();
     },
   );
@@ -231,7 +216,11 @@ export function configureCursor(
       );
     const ids = [
       ...new Set(
-        models.filter((model) => model.chat_candidate).map((model) => model.id),
+        models
+          // Cursor reaches Concentrate only through Chat Completions, where
+          // Claude models are not cached yet, so they are left out for now.
+          .filter((model) => model.chat_candidate && !/^claude-/.test(model.id))
+          .map((model) => model.id),
       ),
     ];
     if (!ids.length)

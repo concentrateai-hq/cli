@@ -376,7 +376,7 @@ export async function runKey(
 export function runLogout(env: Environment = process.env) {
   // Removing the key comes first in importance: a tool that cannot be reset
   // (Cursor running, a damaged config) must not keep the saved key on disk.
-  for (const id of ["opencode", "pi", "codex", "cursor"] as const) {
+  for (const id of ["opencode", "pi", "codex", "cursor", "copilot"] as const) {
     const label = configurableTool(id).label;
     try {
       if (!toolConfigured(id, env)) continue;
