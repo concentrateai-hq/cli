@@ -113,6 +113,7 @@ cn configure codex
 cn configure opencode
 cn configure pi
 cn configure cursor             # Cursor desktop; quit the app first
+cn configure copilot            # GitHub Copilot app (macOS); quit the app first
 ```
 
 Save your key with `cn key` first. Configuration writes to the tool’s own settings;
@@ -127,15 +128,22 @@ them too. A Codex setup that only added the Concentrate provider (for plain
 `codex resume`) stays that way when refreshed.
 
 For Cursor desktop, install and open Cursor once, then quit it before Configure or
-Reset. Select models in Cursor afterward. Cursor stores your Concentrate key and
+Reset. Select models in Cursor afterward. Claude models are not added for now,
+because Cursor reaches Concentrate only through Chat Completions, where Claude is
+not cached yet. Cursor stores your Concentrate key and
 sends requests through Cursor’s servers; Tab completions still use Cursor’s models.
 Cursor setup requires `sqlite3` and `pgrep` (included with macOS). It configures the
 desktop editor, not the Cursor CLI.
 
+For the GitHub Copilot app, open it once, then quit it before Configure or Reset
+(cn tells you if it is still open). cn adds a "Concentrate AI" provider; pick its
+models in the app's model picker.
+Setup requires `sqlite3` and `pgrep` (included with macOS).
+
 To restore the settings from before Configure:
 
 ```sh
-cn reset claude                 # Or codex, opencode, pi, cursor
+cn reset claude                 # Or codex, opencode, pi, cursor, copilot
 ```
 
 Reset preserves settings you edited afterward and reports what it kept. Shell

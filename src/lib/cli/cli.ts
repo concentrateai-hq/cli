@@ -1,5 +1,8 @@
-import { isConfigurableTool } from "../harnesses/configurable-tools.js";
-import { CURSOR_NOTICE } from "../config/cursor-config.js";
+import {
+  DESKTOP_APPS,
+  isConfigurableTool,
+  isDesktopApp,
+} from "../harnesses/configurable-tools.js";
 import type { Environment, HarnessId } from "../types.js";
 import {
   askBaaOnce,
@@ -44,6 +47,7 @@ Usage:
   cn configure <tool>                       Connect a coding tool to Concentrate
   cn reset <tool>                           Remove Concentrate setup from a coding tool
   cn configure cursor                      Connect Cursor desktop (quit Cursor first)
+  cn configure copilot                     Connect the GitHub Copilot app (quit it first)
   cn settings                              Open interactive settings
   cn config                                   Show key status and default models
   cn login [--device]                         Sign in with your browser and save a new API key
@@ -209,10 +213,11 @@ async function dispatch(argv: string[], env: Environment) {
       const target = positionals[0];
       if (!target || !isConfigurableTool(target) || positionals.length !== 1)
         throw usageError("Choose one tool: cn configure <tool>");
-      if (target === "cursor") console.log(CURSOR_NOTICE);
       const file = await configureTool(target, env);
       console.log(
-        `Configured ${target}. Restart the tool to use Concentrate. Configuration: ${file}`,
+        isDesktopApp(target)
+          ? ledger("ok", target, DESKTOP_APPS[target].done)
+          : `Configured ${target}. Restart the tool to use Concentrate. Configuration: ${file}`,
       );
       return 0;
     }

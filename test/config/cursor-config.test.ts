@@ -32,6 +32,11 @@ vi.mock("../../src/lib/executables.js", { spy: true });
 const ROOT = "https://api.concentrate.ai";
 const models = [
   { id: "test-tool-model", name: "Tool model", chat_candidate: true },
+  {
+    id: "claude-sonnet-5-5",
+    name: "Claude, not cached yet",
+    chat_candidate: true,
+  },
   { id: "not-a-tool-model", name: "Chat only", chat_candidate: false },
 ];
 const keys = [
@@ -195,7 +200,7 @@ test("Cursor rejects running processes, malformed settings, symlinks and empty c
     mode: 0o755,
   });
   expect(() => configureCursor(ROOT, "sk-dummy", models, f.env)).toThrow(
-    /Quit Cursor/,
+    /Cursor is open/,
   );
   expect(rowsOf(f)).toStrictEqual(before);
   fs.writeFileSync(path.join(f.bin, "pgrep"), "#!/bin/sh\nexit 1\n", {
