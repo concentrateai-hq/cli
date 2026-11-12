@@ -63,6 +63,7 @@ test("argument parsing", () => {
 test("unknown commands and tools exit 2", () => {
   const { env } = setup();
   expect(runCn(["bogus"], { env }).status).toBe(2);
+  expect(runCn(["login"], { env }).status).toBe(2);
   expect(runCn(["model", "nope"], { env }).status).toBe(2);
   expect(runCn(["models", "--limit", "0"], { env }).status).toBe(2);
 });

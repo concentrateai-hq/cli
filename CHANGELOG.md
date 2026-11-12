@@ -11,10 +11,6 @@
   (Claude Sonnet, GPT Terra, DeepSeek Flash), so `cn claude` now defaults to
   Claude Sonnet 5.5. Choosing a model for one tool no longer pins the others.
 - `cn claude` keeps MCP server sign-ins and approvals between launches.
-- `cn login` signs you in with your browser (or a device code over SSH), lets
-  you pick your personal account or an organization, and saves an API key for
-  it: the key this computer already has there, or a new one named after your
-  computer.
 - `cn baa` asks once whether your account has a BAA and, if so, shows only
   BAA-covered models.
 - `cn configure copilot` sets up the GitHub Copilot desktop app (macOS) with a
