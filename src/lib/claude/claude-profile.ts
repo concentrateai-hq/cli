@@ -29,15 +29,25 @@ function deviceId(env: Environment) {
 
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
+const readQuietly = (file: string): unknown => {
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return undefined; // first launch, or a damaged copy: nothing to carry
+  }
+};
+
+// Finishing Claude's welcome (theme, security notes, terminal setup) is
+// recorded here. The user's own file wins; without one, keep the profile's.
+const WELCOME = ["hasCompletedOnboarding", "lastOnboardingVersion"];
+
 // Claude saves .mcp.json approvals and folder trust in the profile's copy.
 // Carry them onto the user's file so they last between launches.
 function carryApprovals(state: Record<string, unknown>, file: string) {
-  let previous: unknown;
-  try {
-    previous = JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch {
-    // first launch, or a damaged copy: nothing to carry
-  }
+  const previous = readQuietly(file);
+  for (const key of WELCOME)
+    if (!(key in state) && key in record(previous))
+      state[key] = record(previous)[key];
   const projects = record(state.projects);
   for (const [dir, value] of Object.entries(
     record(record(previous).projects),
@@ -53,6 +63,23 @@ function carryApprovals(state: Record<string, unknown>, file: string) {
     projects[dir] = to;
   }
   state.projects = projects;
+}
+
+// Claude saves the theme picked in its welcome to settings.json. Keep it when
+// the user's own settings choose none, so the theme picker does not return.
+function keepTheme(file: string, previous: string | null) {
+  const theme = previous ? record(readQuietly(previous)).theme : undefined;
+  if (typeof theme !== "string") return;
+  let settings: unknown = {};
+  if (fs.existsSync(file)) {
+    settings = readQuietly(file);
+    if (!isRecord(settings) || "theme" in settings) return; // leave it as is
+  }
+  fs.writeFileSync(
+    file,
+    JSON.stringify({ ...record(settings), theme }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
 }
 
 export const claudeProfileDir = (env: Environment) =>
@@ -76,6 +103,7 @@ export function prepareClaudeProfile(env: Environment) {
     for (const file of [ended, ...old])
       fs.rmSync(file, { recursive: true, force: true });
   };
+  let previousSettings: string | null = null;
   try {
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
     // Copy user customizations rather than linking their writable settings. Do
@@ -101,6 +129,7 @@ export function prepareClaudeProfile(env: Environment) {
       try {
         fs.renameSync(to, aside);
         old.push(aside);
+        if (name === "settings.json") previousSettings = aside;
       } catch (error) {
         if (errorCode(error) !== "ENOENT") throw error;
       }
@@ -109,6 +138,7 @@ export function prepareClaudeProfile(env: Environment) {
         else fs.cpSync(from, to, { recursive: true, verbatimSymlinks: true });
       }
     }
+    keepTheme(path.join(directory, "settings.json"), previousSettings);
     // An explicit CLAUDE_CONFIG_DIR moves Claude's global state file into it.
     const global = env.CLAUDE_CONFIG_DIR
       ? path.join(source, ".claude.json")

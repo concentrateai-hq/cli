@@ -229,3 +229,63 @@ test("a user .claude.json that is not an object is passed through unchanged", ()
   fs.writeFileSync(path.join(source, ".claude.json"), "[1]");
   expect(readProfile(launch(env), ".claude.json")).toBe("[1]");
 });
+
+test("Claude's welcome is shown once when the user has no Claude files of their own", () => {
+  const { env } = sourceEnv("cn-profile-welcome-");
+  const first = launch(env);
+  // What Claude saves after its welcome: theme in settings, flags in state.
+  fs.writeFileSync(
+    path.join(first.directory, "settings.json"),
+    '{"theme":"dark"}',
+  );
+  const state = JSON.parse(readProfile(first, ".claude.json"));
+  fs.writeFileSync(
+    path.join(first.directory, ".claude.json"),
+    JSON.stringify({
+      ...state,
+      hasCompletedOnboarding: true,
+      lastOnboardingVersion: "2.1.323",
+    }),
+  );
+  const second = launch(env);
+  expect(JSON.parse(readProfile(second, "settings.json"))).toStrictEqual({
+    theme: "dark",
+  });
+  const kept = JSON.parse(readProfile(second, ".claude.json"));
+  expect(kept.hasCompletedOnboarding).toBe(true);
+  expect(kept.lastOnboardingVersion).toBe("2.1.323");
+});
+
+test("the user's own welcome flags and theme win over the profile's", () => {
+  const { source, env } = sourceEnv("cn-profile-welcome-user-");
+  fs.writeFileSync(
+    path.join(source, ".claude.json"),
+    '{"hasCompletedOnboarding":false,"lastOnboardingVersion":"1.0.0"}',
+  );
+  fs.writeFileSync(path.join(source, "settings.json"), '{"model":"sonnet"}');
+  const first = launch(env);
+  fs.writeFileSync(
+    path.join(first.directory, "settings.json"),
+    '{"theme":"dark"}',
+  );
+  fs.writeFileSync(
+    path.join(first.directory, ".claude.json"),
+    '{"hasCompletedOnboarding":true,"lastOnboardingVersion":"2.1.323"}',
+  );
+  const second = launch(env);
+  const state = JSON.parse(readProfile(second, ".claude.json"));
+  expect(state.hasCompletedOnboarding).toBe(false);
+  expect(state.lastOnboardingVersion).toBe("1.0.0");
+  // A theme chosen under cn is added only when the user's settings set none.
+  expect(JSON.parse(readProfile(second, "settings.json"))).toStrictEqual({
+    model: "sonnet",
+    theme: "dark",
+  });
+  fs.writeFileSync(
+    path.join(source, "settings.json"),
+    '{"model":"sonnet","theme":"light"}',
+  );
+  expect(JSON.parse(readProfile(launch(env), "settings.json")).theme).toBe(
+    "light",
+  );
+});
