@@ -29,9 +29,9 @@ import {
 } from "../harnesses/tool-config.js";
 import fs from "node:fs";
 import path from "node:path";
-import { CnError } from "../errors.js";
+import { CnError, EXIT } from "../errors.js";
 import { errorMessage } from "../validation.js";
-import { isApiKey } from "../safe.js";
+import { isApiKey, isOpenAiModel } from "../safe.js";
 import { getHarness, listHarnesses } from "../harnesses/registry.js";
 import { which } from "./launch.js";
 import { ask, askHidden } from "./prompt.js";
@@ -585,13 +585,44 @@ export function showConfig(env: Environment = process.env) {
   return 0;
 }
 
+// A typed model must be one the tool can use. Without a catalog (offline, no
+// cache) the ID is saved as given; the picker still accepts custom IDs.
+async function checkModelChoice(
+  target: HarnessId,
+  id: string,
+  env: Environment,
+) {
+  if (target === "codex" && !isOpenAiModel(id))
+    throw new CnError(
+      `Codex supports OpenAI models only for now. Run cn models codex to see them.`,
+      EXIT.USAGE,
+    );
+  let catalog: Model[];
+  try {
+    catalog = (await fetchCatalog({ env })).models;
+  } catch {
+    return;
+  }
+  if (!catalog.length) return;
+  const known = modelsFor(target, catalog).some(
+    (m) => m.id === id || m.variants?.some((v) => v.id === id),
+  );
+  if (known) return;
+  const which = readBaa(env) ? "BAA-covered model" : "model";
+  throw new CnError(
+    `No ${which} named ${id} for ${getHarness(target).label}. Run cn models ${target} to see the list.`,
+    EXIT.USAGE,
+  );
+}
+
 export async function runModel(
   { target, modelId }: { target?: HarnessId; modelId?: string },
   env: Environment = process.env,
 ) {
   if (!target) return showConfig(env);
   let pick = modelId;
-  if (!pick) {
+  if (pick) await checkModelChoice(target, pick, env);
+  else {
     let catalog: Model[] = [];
     try {
       catalog = (await fetchCatalog({ env })).models;
