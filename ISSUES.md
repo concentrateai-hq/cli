@@ -191,6 +191,9 @@ folder it names, then try again.
 - Cursor: work in progress, not tested in a full desktop session. Claude models
   are left out until they can be cached.
 - GitHub Copilot app: macOS only.
+- Claude Code: plugins, MCP servers, skills, or memory edits you add inside
+  `cn claude` don't stay after you quit. Add them in normal `claude` instead;
+  `cn claude` picks them up on its next launch.
 - macOS and Linux only.
 - `cn` works with whatever version of each tool you have installed. If a tool
   updates and `cn` misbehaves, update `cn` first, then report it. The tools
