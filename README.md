@@ -12,13 +12,14 @@ and the coding tools you want to use installed on your `PATH`.
 
 ## Supported tools
 
-| Tool             | Support                                              |
-| ---------------- | ---------------------------------------------------- |
-| Claude Code      | Works                                                |
-| OpenCode         | Works                                                |
-| Pi               | Works                                                |
-| Codex            | OpenAI models only for now. More models coming soon. |
-| Cursor (desktop) | Work in progress. Set up with `cn configure cursor`. |
+| Tool                   | Support                                               |
+| ---------------------- | ----------------------------------------------------- |
+| Claude Code            | Works                                                 |
+| OpenCode               | Works                                                 |
+| Pi                     | Works                                                 |
+| Codex                  | OpenAI models only for now. More models coming soon.  |
+| Cursor (desktop)       | Work in progress. Set up with `cn configure cursor`.  |
+| GitHub Copilot (app)   | Works (macOS). Set up with `cn configure copilot`.    |
 
 ## Install
 
@@ -88,7 +89,7 @@ while you run through `cn`.
 ## Codex
 
 - Works with OpenAI models for now. More models are coming soon.
-- The default model is `gpt-6.1-terra`. Pick another with `cn model codex`.
+- The default model is the newest GPT Terra model. Pick another with `cn model codex`.
 - Conversations you start with `cn codex` can be reopened with plain `codex resume`.
   `cn` offers to set that up the first time you run it. It doesn't change your
   default model or your Codex login.
@@ -107,10 +108,28 @@ while you run through `cn`.
 
 Work in progress: expect changes.
 
-- `cn configure cursor` sets up the Cursor desktop editor. Quit Cursor first.
+- `cn configure cursor` sets up the Cursor desktop editor. If Cursor is open,
+  cn asks you to quit it; reopen it afterward.
+- Claude models are not added for now: Cursor can only use Chat Completions,
+  where Claude isn't cached yet, so long chats would cost much more. Use
+  `cn claude` for Claude models.
 - Cursor stores your key and sends requests through Cursor's servers. Tab
   completions keep using Cursor's own models.
 - This sets up the editor, not the Cursor command-line tool.
+
+## GitHub Copilot app
+
+macOS only for now.
+
+- `cn configure copilot` adds a "Concentrate AI" provider with the Concentrate
+  models that support tool calls to the GitHub Copilot desktop app. If the app is
+  open, cn asks you to quit it. Reopen it afterward and pick a model under
+  Concentrate AI.
+- Claude models are cached. Other models use Chat Completions for now, so GPT
+  can be a little slower on long tasks.
+- The app keeps your key in its local settings database. `cn key` updates it,
+  and `cn reset copilot` or `cn logout` removes the provider. Providers you added
+  yourself are left alone.
 
 ## Models
 
@@ -176,6 +195,7 @@ since. Save your key first with `cn key`.
 | `cn models [<tool>]`  | Browse available models                         |
 | `cn key`              | Replace your saved API key                      |
 | `cn logout`           | Remove your saved API key                       |
+| `cn baa [on\|off]`    | Show only models covered by a BAA               |
 | `cn doctor [<tool>]`  | Check your setup, or test a tool's live route   |
 | `cn update`           | Update cn and refresh configured tools          |
 | `cn refresh`          | Refresh configured tools with the latest models |

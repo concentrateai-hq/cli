@@ -120,8 +120,19 @@ grows with the conversation, and other models to the Responses API.
 `cn` needs Pi 0.77 or newer, which reads the key from the environment as `cn`
 writes it. Run `pi update self`, then try again.
 
-Cursor can only reach Concentrate through Chat Completions, so Claude models in
-Cursor are not cached. Use `cn claude` for Claude models.
+**Claude models are missing in Cursor, or not cached**
+Cursor can only reach Concentrate through Chat Completions, where Claude models
+are not cached yet, so `cn configure cursor` leaves them out for now. If you add
+one by hand, every turn is billed in full. Use `cn claude` for Claude models.
+
+**GPT fails in the Copilot app with `tools.80.type: Invalid discriminator value`**
+The provider was set up by hand on the Responses API, where the app sends a
+`tool_search` tool that Concentrate does not accept yet. Remove it and run
+`cn configure copilot`, which uses Chat Completions for non-Claude models.
+
+**The first message in the Copilot app is slow**
+The app sends all of its tools, including connector tools, with every request.
+Later turns are cached and faster.
 
 **OpenCode resume says the session was not found**
 Run the resume command from the project folder where the session was started.
@@ -177,7 +188,12 @@ folder it names, then try again.
 
 - Codex: OpenAI models only. Other models are rejected by the gateway for
   Codex's request format.
-- Cursor: work in progress, not tested in a full desktop session.
+- Cursor: work in progress, not tested in a full desktop session. Claude models
+  are left out until they can be cached.
+- GitHub Copilot app: macOS only.
+- Claude Code: plugins, MCP servers, skills, or memory edits you add inside
+  `cn claude` don't stay after you quit. Add them in normal `claude` instead;
+  `cn claude` picks them up on its next launch.
 - macOS and Linux only.
 - `cn` works with whatever version of each tool you have installed. If a tool
   updates and `cn` misbehaves, update `cn` first, then report it. The tools

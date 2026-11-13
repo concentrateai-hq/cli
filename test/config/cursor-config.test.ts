@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { test, expect } from "vitest";
+import { test, expect, vi } from "vitest";
 import {
   cursorDatabase,
   configureCursor,
@@ -19,15 +19,25 @@ import {
 } from "../../src/lib/config/sqlite-store.js";
 import {
   configureTool,
+  refreshConfiguredKey,
   resetTool,
   toolConfigured,
 } from "../../src/lib/harnesses/tool-config.js";
 import { writeKey, writeJson } from "../../src/lib/config/settings.js";
+import { which } from "../../src/lib/executables.js";
 import { tempDir, runCn } from "../helpers.js";
+import { integrateTool } from "../../src/lib/cli/launcher.js";
+
+vi.mock("../../src/lib/executables.js", { spy: true });
 
 const ROOT = "https://api.concentrate.ai";
 const models = [
   { id: "test-tool-model", name: "Tool model", chat_candidate: true },
+  {
+    id: "claude-sonnet-5-5",
+    name: "Claude, not cached yet",
+    chat_candidate: true,
+  },
   { id: "not-a-tool-model", name: "Chat only", chat_candidate: false },
 ];
 const keys = [
@@ -191,7 +201,7 @@ test("Cursor rejects running processes, malformed settings, symlinks and empty c
     mode: 0o755,
   });
   expect(() => configureCursor(ROOT, "sk-dummy", models, f.env)).toThrow(
-    /Quit Cursor/,
+    /Cursor is open/,
   );
   expect(rowsOf(f)).toStrictEqual(before);
   fs.writeFileSync(path.join(f.bin, "pgrep"), "#!/bin/sh\nexit 1\n", {
@@ -229,12 +239,30 @@ test("Cursor CLI Configure/Reset and global Reset/Logout include desktop credent
   const f = await configuredWithSavedKey();
   const result = runCn(["reset", "cursor"], { env: f.env });
   expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout).toMatch(/Removed\. Quit and reopen Cursor/);
+  expect(result.stdout).not.toMatch(/shell/);
   const configured = runCn(["configure", "cursor"], { env: f.env });
   expect(configured.status, configured.stderr).toBe(0);
   expect(configured.stdout).toMatch(/Cursor's servers/);
   resetTool("cursor", f.env);
   expect(userOf(f)).toStrictEqual(initial);
   expect(rowsOf(f).get(CURSOR_SECRET_ROW)).toBe("original-encrypted-key");
+});
+
+test("Configure and Reset from the menu print the same short lines as cn configure and cn reset", async () => {
+  const f = await configuredWithSavedKey();
+  resetTool("cursor", f.env);
+  const log = vi.spyOn(console, "log").mockImplementation(() => {});
+  try {
+    await integrateTool("configure", "cursor", f.env);
+    await integrateTool("reset", "cursor", f.env);
+    const printed = log.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(printed).toMatch(/Done\. Open Cursor and pick a model/);
+    expect(printed).toMatch(/Removed\. Quit and reopen Cursor/);
+    expect(printed).not.toMatch(/Settings file|shell/);
+  } finally {
+    log.mockRestore();
+  }
 });
 
 test.each([
@@ -250,6 +278,67 @@ test.each([
     expect(rowsOf(f).get(CURSOR_SECRET_ROW)).toBe("original-encrypted-key");
   },
 );
+
+test("Cursor reads and updates a settings value of several hundred KB quickly", () => {
+  const f = fixture();
+  const user = { ...initial, history: 'é"x\\'.repeat(150_000) };
+  edit(f, CURSOR_USER_ROW, JSON.stringify(user));
+  const started = performance.now();
+  configureCursor(ROOT, "sk-dummy", models, f.env);
+  expect(cursorConfigured(f.env)).toBe(true);
+  expect(resetCursor(f.env).reset).toBe(true);
+  expect(performance.now() - started).toBeLessThan(5000);
+  expect(userOf(f)).toStrictEqual(user);
+});
+
+test("Cursor's database opens after a clean quit removed its -wal and -shm files", () => {
+  const f = fixture();
+  const wal = spawnSync("/usr/bin/sqlite3", [f.database], {
+    input: "PRAGMA journal_mode=WAL;",
+    encoding: "utf8",
+  });
+  expect(wal.status, wal.stderr).toBe(0);
+  for (const suffix of ["-wal", "-shm"])
+    expect(fs.existsSync(f.database + suffix)).toBe(false);
+  expect(cursorConfigured(f.env)).toBe(false);
+  configureCursor(ROOT, "sk-dummy", models, f.env);
+  expect(cursorConfigured(f.env)).toBe(true);
+});
+
+test("Cursor counts as not configured when sqlite3 is missing", () => {
+  const f = fixture();
+  configureCursor(ROOT, "sk-dummy", models, f.env);
+  vi.mocked(which).mockReturnValueOnce(null).mockReturnValueOnce(null);
+  expect(cursorConfigured(f.env)).toBe(false);
+});
+
+test("Logout reports a Cursor setup it cannot read instead of skipping it", async () => {
+  const f = await configuredWithSavedKey();
+  fs.writeFileSync(f.database, "not a sqlite database");
+  const result = runCn(["logout"], { env: f.env });
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout).toMatch(/could not be reset.*copy of the key remains/);
+  expect(result.stdout).toMatch(/saved key removed/);
+});
+
+test("Global reset still clears cn when Cursor's settings cannot be read", async () => {
+  const f = await configuredWithSavedKey();
+  fs.writeFileSync(f.database, "not a sqlite database");
+  const result = runCn(["reset", "--yes"], { env: f.env });
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout).toMatch(/Cursor desktop.*not checked/);
+  expect(
+    fs.existsSync(path.join(f.env.CN_CONFIG_HOME, "credentials.json")),
+  ).toBe(false);
+});
+
+test("Key refresh reports a Cursor setup it cannot read instead of skipping it", async () => {
+  const f = await configuredWithSavedKey();
+  fs.writeFileSync(f.database, "not a sqlite database");
+  expect(() => refreshConfiguredKey(f.env)).toThrow(
+    /Cursor's key could not be refreshed/,
+  );
+});
 
 test("Cursor SQL values with quotes round-trip without executing their contents", () => {
   const f = fixture();

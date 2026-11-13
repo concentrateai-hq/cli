@@ -4,7 +4,8 @@ import { test, expect } from "vitest";
 import { maskKey } from "../../src/lib/cli/commands.js";
 import { parseFlags, parseLaunchArgs } from "../../src/lib/cli/cli.js";
 import { which } from "../../src/lib/cli/launch.js";
-import { fakeTool, runCn, setup, tempDir } from "../helpers.js";
+import { DEFAULT_MODELS } from "../../src/lib/config/settings.js";
+import { fakeTool, runCn, setup, tempDir, writeCatalog } from "../helpers.js";
 
 test("a missing tool fails fast with exit 127, an install hint, and no key or network needed", () => {
   const { bin, env } = setup({ CONCENTRATE_API_KEY: "" });
@@ -62,6 +63,7 @@ test("argument parsing", () => {
 test("unknown commands and tools exit 2", () => {
   const { env } = setup();
   expect(runCn(["bogus"], { env }).status).toBe(2);
+  expect(runCn(["login"], { env }).status).toBe(2);
   expect(runCn(["model", "nope"], { env }).status).toBe(2);
   expect(runCn(["models", "--limit", "0"], { env }).status).toBe(2);
 });
@@ -74,7 +76,9 @@ test("setup asks only for the key; config, model, and logout work end to end", (
   });
   expect(setupResult.status, setupResult.stderr).toBe(0);
   expect(setupResult.stdout).toMatch(/ready/);
-  expect(setupResult.stdout).toMatch(/cn claude\s+claude-sonnet-4-6/);
+  expect(setupResult.stdout).toMatch(
+    new RegExp(`cn claude\\s+${DEFAULT_MODELS.claude}`),
+  );
   expect(setupResult.stdout, "no per-tool model questions").not.toMatch(
     /default model/,
   );
@@ -178,4 +182,71 @@ test("a model ID that looks like a flag is refused before anything launches", ()
 test("maskKey hides the key and shows only the last four characters", () => {
   expect(maskKey("sk-live-abcdef123456")).toBe("••••••••3456");
   expect(maskKey("short")).toBe("••••••••");
+});
+
+test("keeping the default at the model prompt saves nothing, so the tool follows newer releases", () => {
+  const { config, env } = setup();
+  const flash = { id: "deepseek-v4-1-flash", released: "2026-09-10" };
+  writeCatalog(config, [flash]);
+  const kept = runCn(["model", "pi"], { env, input: "\n" });
+  expect(kept.status, kept.stderr).toBe(0);
+  writeCatalog(config, [
+    flash,
+    { id: "deepseek-v5-flash", released: "2026-12-01" },
+  ]);
+  expect(runCn(["config"], { env }).stdout).toMatch(/Pi\s+deepseek-v5-flash/);
+});
+
+test("cn model refuses a model the tool can't use, and saves nothing", () => {
+  const { config, env } = setup();
+  writeCatalog(config, [
+    { id: "deepseek-v4-1-flash", chat_candidate: true },
+    {
+      id: "gpt-6.1-terra",
+      codex: true,
+      chat_candidate: true,
+      variants: [{ id: "azure/gpt-6.1-terra", chat_candidate: true }],
+    },
+  ]);
+  const codex = runCn(["model", "codex", "deepseek-v4-1-flash"], { env });
+  expect(codex.status).toBe(2);
+  expect(codex.stderr).toMatch(/Codex supports OpenAI models only/);
+  const unknown = runCn(["model", "pi", "not-a-real-model"], { env });
+  expect(unknown.status).toBe(2);
+  expect(unknown.stderr).toMatch(
+    /No model named not-a-real-model for Pi\. Run cn models pi/,
+  );
+  expect(fs.existsSync(path.join(config, "config.json"))).toBe(false);
+  expect(runCn(["model", "pi", "azure/gpt-6.1-terra"], { env }).status).toBe(0);
+  expect(runCn(["model", "codex", "gpt-6.1-terra"], { env }).status).toBe(0);
+});
+
+test("without a catalog, cn model still saves the ID as typed", () => {
+  const { env } = setup();
+  const result = runCn(["model", "pi", "brand-new-model"], { env });
+  expect(result.status, result.stderr).toBe(0);
+  expect(runCn(["config"], { env }).stdout).toMatch(/Pi\s+brand-new-model/);
+});
+
+test.each([
+  ["on", true, 1],
+  ["off", false, 2],
+])(
+  "cn baa %s saves the answer and filters the model list",
+  (value, baa, count) => {
+    const { config, env } = setup();
+    writeCatalog(config, [
+      { id: "covered", name: "Covered", baa: true },
+      { id: "uncovered", name: "Uncovered", baa: false },
+    ]);
+    expect(runCn(["baa", value], { env }).status).toBe(0);
+    expect(
+      JSON.parse(fs.readFileSync(path.join(config, "config.json"), "utf8")),
+    ).toMatchObject({ baa });
+    expect(runCn(["models"], { env }).stdout).toMatch(`${count} models`);
+  },
+);
+
+test("cn baa rejects anything but on or off", () => {
+  expect(runCn(["baa", "maybe"], setup()).status).toBe(2);
 });

@@ -1,12 +1,30 @@
 # Changelog
 
-## Unreleased
+## 0.1.5 (2026-11-12)
 
 - **Requires Node.js 22.13 or newer.** The installer, `cn update`, and `cn`
   itself stop with a clear message on older Node; install a current Node.js
   first.
 - Install and update downloads now come from the `concentrateai-hq/cli`
   repository. Old links keep redirecting.
+- Tools you haven't chosen a model for start on the newest model in their tier
+  (Claude Sonnet, GPT Terra, DeepSeek Flash), so `cn claude` now defaults to
+  Claude Sonnet 5.5. Choosing a model for one tool no longer pins the others.
+- `cn claude` keeps MCP server sign-ins and approvals between launches.
+- `cn baa` asks once whether your account has a BAA and, if so, shows only
+  BAA-covered models.
+- `cn configure copilot` sets up the GitHub Copilot desktop app (macOS) with a
+  "Concentrate AI" provider. `cn reset copilot` removes it.
+- `cn refresh` and `cn update` now refresh Cursor and Copilot too.
+- Cursor setup leaves out Claude models for now, since Cursor can't cache them.
+- Checking Cursor's settings no longer freezes `cn`, and setup works after
+  Cursor is fully quit.
+- `cn claude` shows Claude Code's welcome only on the first launch, even if
+  you don't use Claude Code on its own.
+- `cn model` refuses models the tool can't use, such as a non-OpenAI model for
+  Codex or a misspelled model ID, instead of saving them.
+- Shorter messages after configuring or resetting Cursor and Copilot, and
+  `cn --help` lines up.
 
 ## 0.1.4 (2026-11-02)
 

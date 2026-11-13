@@ -41,8 +41,10 @@ to choose another one. For Codex, `continue` and the picker list interactive ses
 only; add `--include-non-interactive` to include scripted runs and subagent threads.
 
 Use the same OS account and configuration directory that saved the session.
-For Claude, `cn` uses a temporary copy of your user profile while sharing its
-project session directory. Model changes inside `cn claude` therefore do not
+For Claude, `cn` keeps its own Claude profile in `claude-profile/` under its
+configuration directory, refreshed from your user profile at each launch, while
+sharing its project session directory. Sign-ins and MCP server approvals made
+under `cn claude` last between launches. Model changes inside `cn claude` therefore do not
 change the default model in your ordinary Claude user settings. Claude itself
 chooses how to restore a session's last model when you later resume it normally;
 if it does not recognize that model, it falls back to its normal default.
@@ -82,8 +84,12 @@ has enough context capacity for its history.
 Concentrate automatically selects the provider for every tool. Model pickers
 show one entry per model, without separate provider variants.
 
+Until you choose a model with `cn model <tool>`, each tool starts on the newest
+model in its tier: Claude Sonnet for Claude Code, GPT Terra for Codex, and
+DeepSeek Flash for OpenCode and Pi.
+
 Codex is limited to OpenAI models (`gpt-*`, `o<n>`) for now, defaulting to
-`gpt-6.1-terra`. A saved non-OpenAI default falls back to that model, and
+the newest GPT Terra model. A saved non-OpenAI default falls back to that model, and
 `cn codex --model <non-OpenAI id>` is refused.
 
 ```sh
@@ -107,6 +113,7 @@ cn configure codex
 cn configure opencode
 cn configure pi
 cn configure cursor             # Cursor desktop; quit the app first
+cn configure copilot            # GitHub Copilot app (macOS); quit the app first
 ```
 
 Save your key with `cn key` first. Configuration writes to the tool’s own settings;
@@ -121,15 +128,22 @@ them too. A Codex setup that only added the Concentrate provider (for plain
 `codex resume`) stays that way when refreshed.
 
 For Cursor desktop, install and open Cursor once, then quit it before Configure or
-Reset. Select models in Cursor afterward. Cursor stores your Concentrate key and
+Reset. Select models in Cursor afterward. Claude models are not added for now,
+because Cursor reaches Concentrate only through Chat Completions, where Claude is
+not cached yet. Cursor stores your Concentrate key and
 sends requests through Cursor’s servers; Tab completions still use Cursor’s models.
 Cursor setup requires `sqlite3` and `pgrep` (included with macOS). It configures the
 desktop editor, not the Cursor CLI.
 
+For the GitHub Copilot app, open it once, then quit it before Configure or Reset
+(cn tells you if it is still open). cn adds a "Concentrate AI" provider; pick its
+models in the app's model picker.
+Setup requires `sqlite3` and `pgrep` (included with macOS).
+
 To restore the settings from before Configure:
 
 ```sh
-cn reset claude                 # Or codex, opencode, pi, cursor
+cn reset claude                 # Or codex, opencode, pi, cursor, copilot
 ```
 
 Reset preserves settings you edited afterward and reports what it kept. Shell
