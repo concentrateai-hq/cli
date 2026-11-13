@@ -177,7 +177,7 @@ async function action(
 
 type IntegrationAction = "configure" | "reset";
 
-async function integrateTool(
+export async function integrateTool(
   operation: IntegrationAction,
   target: ConfigurableToolId,
   env: Environment,
@@ -189,7 +189,9 @@ async function integrateTool(
       ledger(
         "ok",
         tool.label,
-        `Concentrate connected. Open the tool normally after restarting it. Settings file: ${file}`,
+        isDesktopApp(target)
+          ? DESKTOP_APPS[target].done
+          : `Concentrate connected. Open the tool normally after restarting it. Settings file: ${file}`,
       ),
     );
   } else {
@@ -199,15 +201,19 @@ async function integrateTool(
         result.reset ? "ok" : "mute",
         tool.label,
         result.reset
-          ? "Concentrate setup removed. Restart the tool."
+          ? isDesktopApp(target)
+            ? DESKTOP_APPS[target].reset
+            : "Concentrate setup removed. Restart the tool."
           : "No Concentrate setup added by cn to remove.",
       ),
     );
     for (const field of result.preserved)
       console.log(`Kept your edit: ${field}`);
-    console.log(
-      "A Concentrate connection set separately in your shell can still apply.",
-    );
+    // Desktop apps never read the shell's environment.
+    if (!isDesktopApp(target))
+      console.log(
+        "A Concentrate connection set separately in your shell can still apply.",
+      );
   }
 }
 
