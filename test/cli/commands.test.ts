@@ -197,6 +197,37 @@ test("keeping the default at the model prompt saves nothing, so the tool follows
   expect(runCn(["config"], { env }).stdout).toMatch(/Pi\s+deepseek-v5-flash/);
 });
 
+test("cn model refuses a model the tool can't use, and saves nothing", () => {
+  const { config, env } = setup();
+  writeCatalog(config, [
+    { id: "deepseek-v4-1-flash", chat_candidate: true },
+    {
+      id: "gpt-6.1-terra",
+      codex: true,
+      chat_candidate: true,
+      variants: [{ id: "azure/gpt-6.1-terra", chat_candidate: true }],
+    },
+  ]);
+  const codex = runCn(["model", "codex", "deepseek-v4-1-flash"], { env });
+  expect(codex.status).toBe(2);
+  expect(codex.stderr).toMatch(/Codex supports OpenAI models only/);
+  const unknown = runCn(["model", "pi", "not-a-real-model"], { env });
+  expect(unknown.status).toBe(2);
+  expect(unknown.stderr).toMatch(
+    /No model named not-a-real-model for Pi\. Run cn models pi/,
+  );
+  expect(fs.existsSync(path.join(config, "config.json"))).toBe(false);
+  expect(runCn(["model", "pi", "azure/gpt-6.1-terra"], { env }).status).toBe(0);
+  expect(runCn(["model", "codex", "gpt-6.1-terra"], { env }).status).toBe(0);
+});
+
+test("without a catalog, cn model still saves the ID as typed", () => {
+  const { env } = setup();
+  const result = runCn(["model", "pi", "brand-new-model"], { env });
+  expect(result.status, result.stderr).toBe(0);
+  expect(runCn(["config"], { env }).stdout).toMatch(/Pi\s+brand-new-model/);
+});
+
 test.each([
   ["on", true, 1],
   ["off", false, 2],
