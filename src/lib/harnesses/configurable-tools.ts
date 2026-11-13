@@ -10,12 +10,14 @@ export const DESKTOP_APPS = {
     label: "Cursor desktop",
     notice: CURSOR_NOTICE,
     done: "Done. Open Cursor and pick a model. Requests go through Cursor's servers.",
+    reset: "Removed. Quit and reopen Cursor to see the change.",
   },
   copilot: {
     id: "copilot",
     label: "GitHub Copilot app",
     notice: COPILOT_NOTICE,
     done: "Done. Open Copilot and pick a model under Concentrate AI.",
+    reset: "Removed. Quit and reopen Copilot to see the change.",
   },
 } as const;
 export const isDesktopApp = (id: string): id is DesktopAppId =>

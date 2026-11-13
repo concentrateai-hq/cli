@@ -256,9 +256,11 @@ async function dispatch(argv: string[], env: Environment) {
           );
         const result = resetTool(target, env);
         console.log(
-          result.reset
-            ? `Concentrate setup removed from ${target}. Restart the tool. Connections set separately in your shell still apply.`
-            : `${target} has no Concentrate setup added by cn to remove.`,
+          result.reset && isDesktopApp(target)
+            ? ledger("ok", target, DESKTOP_APPS[target].reset)
+            : result.reset
+              ? `Concentrate setup removed from ${target}. Restart the tool. Connections set separately in your shell still apply.`
+              : `${target} has no Concentrate setup added by cn to remove.`,
         );
         for (const field of result.preserved)
           console.log(`Kept your edit: ${field}`);

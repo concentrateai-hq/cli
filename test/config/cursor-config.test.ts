@@ -238,6 +238,8 @@ test("Cursor CLI Configure/Reset and global Reset/Logout include desktop credent
   const f = await configuredWithSavedKey();
   const result = runCn(["reset", "cursor"], { env: f.env });
   expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout).toMatch(/Removed\. Quit and reopen Cursor/);
+  expect(result.stdout).not.toMatch(/shell/);
   const configured = runCn(["configure", "cursor"], { env: f.env });
   expect(configured.status, configured.stderr).toBe(0);
   expect(configured.stdout).toMatch(/Cursor's servers/);

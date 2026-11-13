@@ -199,15 +199,19 @@ async function integrateTool(
         result.reset ? "ok" : "mute",
         tool.label,
         result.reset
-          ? "Concentrate setup removed. Restart the tool."
+          ? isDesktopApp(target)
+            ? DESKTOP_APPS[target].reset
+            : "Concentrate setup removed. Restart the tool."
           : "No Concentrate setup added by cn to remove.",
       ),
     );
     for (const field of result.preserved)
       console.log(`Kept your edit: ${field}`);
-    console.log(
-      "A Concentrate connection set separately in your shell can still apply.",
-    );
+    // Desktop apps never read the shell's environment.
+    if (!isDesktopApp(target))
+      console.log(
+        "A Concentrate connection set separately in your shell can still apply.",
+      );
   }
 }
 
