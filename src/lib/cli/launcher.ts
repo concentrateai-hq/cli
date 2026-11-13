@@ -177,7 +177,7 @@ async function action(
 
 type IntegrationAction = "configure" | "reset";
 
-async function integrateTool(
+export async function integrateTool(
   operation: IntegrationAction,
   target: ConfigurableToolId,
   env: Environment,
@@ -189,7 +189,9 @@ async function integrateTool(
       ledger(
         "ok",
         tool.label,
-        `Concentrate connected. Open the tool normally after restarting it. Settings file: ${file}`,
+        isDesktopApp(target)
+          ? DESKTOP_APPS[target].done
+          : `Concentrate connected. Open the tool normally after restarting it. Settings file: ${file}`,
       ),
     );
   } else {

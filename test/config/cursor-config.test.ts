@@ -26,6 +26,7 @@ import {
 import { writeKey, writeJson } from "../../src/lib/config/settings.js";
 import { which } from "../../src/lib/executables.js";
 import { tempDir, runCn } from "../helpers.js";
+import { integrateTool } from "../../src/lib/cli/launcher.js";
 
 vi.mock("../../src/lib/executables.js", { spy: true });
 
@@ -246,6 +247,22 @@ test("Cursor CLI Configure/Reset and global Reset/Logout include desktop credent
   resetTool("cursor", f.env);
   expect(userOf(f)).toStrictEqual(initial);
   expect(rowsOf(f).get(CURSOR_SECRET_ROW)).toBe("original-encrypted-key");
+});
+
+test("Configure and Reset from the menu print the same short lines as cn configure and cn reset", async () => {
+  const f = await configuredWithSavedKey();
+  resetTool("cursor", f.env);
+  const log = vi.spyOn(console, "log").mockImplementation(() => {});
+  try {
+    await integrateTool("configure", "cursor", f.env);
+    await integrateTool("reset", "cursor", f.env);
+    const printed = log.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(printed).toMatch(/Done\. Open Cursor and pick a model/);
+    expect(printed).toMatch(/Removed\. Quit and reopen Cursor/);
+    expect(printed).not.toMatch(/Settings file|shell/);
+  } finally {
+    log.mockRestore();
+  }
 });
 
 test.each([
