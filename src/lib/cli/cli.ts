@@ -39,15 +39,15 @@ Usage:
       tools: ${listHarnesses()
         .map((h) => h.id)
         .join(", ")}
-  cn <tool> resume [<session-id>]            Resume a saved local conversation
-  cn opencode --session <id>                Resume an OpenCode conversation
-  cn <tool> continue                         Continue the latest project conversation
+  cn <tool> resume [<session-id>]             Resume a saved local conversation
+  cn opencode --session <id>                  Resume an OpenCode conversation
+  cn <tool> continue                          Continue the latest project conversation
   cn setup [--no-verify] [--models]           Save your API key (--models also picks defaults)
-  cn configure <tool>                       Connect a coding tool to Concentrate
-  cn reset <tool>                           Remove Concentrate setup from a coding tool
-  cn configure cursor                      Connect Cursor desktop (quit Cursor first)
-  cn configure copilot                     Connect the GitHub Copilot app (quit it first)
-  cn settings                              Open interactive settings
+  cn configure <tool>                         Connect a coding tool to Concentrate
+  cn reset <tool>                             Remove Concentrate setup from a coding tool
+  cn configure cursor                         Connect Cursor desktop (quit Cursor first)
+  cn configure copilot                        Connect the GitHub Copilot app (quit it first)
+  cn settings                                 Open interactive settings
   cn config                                   Show key status and default models
   cn key [--no-verify]                        Replace the saved API key
   cn logout                                   Remove the saved API key
