@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.5 (2026-11-12)
+## 0.1.5 (2026-11-16)
 
 - **Requires Node.js 22.13 or newer.** The installer, `cn update`, and `cn`
   itself stop with a clear message on older Node; install a current Node.js
