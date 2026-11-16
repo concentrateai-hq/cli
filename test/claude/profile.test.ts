@@ -106,6 +106,30 @@ test("cn claude launches share one device ID, so the prompt cache stays warm", (
   }
 });
 
+test("cn claude hides Claude's classifier billing notice without touching the user's file", () => {
+  const root = tempDir("cn-profile-notice-");
+  const env = { HOME: root, CN_CONFIG_HOME: path.join(root, "cn") };
+  const user = path.join(root, ".claude.json");
+  const before = JSON.stringify({
+    userID: "mine",
+    autoModeClassifierBillingNoticeAcknowledgedAt: 1793119733435,
+  });
+  fs.writeFileSync(user, before);
+  const started = Date.now();
+  const profile = prepareClaudeProfile(env);
+  try {
+    const doc = JSON.parse(
+      fs.readFileSync(path.join(profile.directory, ".claude.json"), "utf8"),
+    );
+    expect(
+      doc.autoModeClassifierBillingNoticeAcknowledgedAt,
+    ).toBeGreaterThanOrEqual(started);
+  } finally {
+    profile.cleanup();
+  }
+  expect(fs.readFileSync(user, "utf8")).toBe(before);
+});
+
 const launch = (env) => {
   const profile = prepareClaudeProfile(env);
   profile.cleanup();

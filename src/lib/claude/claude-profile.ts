@@ -160,6 +160,11 @@ export function prepareClaudeProfile(env: Environment) {
       // each launch, so every session would start from a cold cache.
       if (!(typeof state.userID === "string" && state.userID))
         state.userID = deviceId(env);
+      // Claude's notice about auto mode classifier billing describes
+      // Anthropic's own billing, which doesn't apply through Concentrate. It
+      // reappears whenever Claude publishes a newer notice than the last one
+      // dismissed, so mark it seen at each launch. Only cn's copy changes.
+      state.autoModeClassifierBillingNoticeAcknowledgedAt = Date.now();
       writeJson(profileState, state);
     } else {
       fs.copyFileSync(global, profileState); // left damaged, as Claude would see it

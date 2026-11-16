@@ -21,6 +21,8 @@
   Cursor is fully quit.
 - `cn claude` shows Claude Code's welcome only on the first launch, even if
   you don't use Claude Code on its own.
+- `cn claude` no longer shows Claude Code's notice about auto mode classifier
+  billing, which doesn't apply through Concentrate.
 - `cn model` refuses models the tool can't use, such as a non-OpenAI model for
   Codex or a misspelled model ID, instead of saving them.
 - Shorter messages after configuring or resetting Cursor and Copilot, and
