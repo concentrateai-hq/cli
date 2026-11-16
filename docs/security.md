@@ -5,6 +5,7 @@
   - These are removed from its environment: `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_CUSTOM_HEADERS`, `CLAUDE_CODE_OAUTH_TOKEN`, and the Bedrock/Vertex/Foundry switches.
   - The same names are blanked in the settings `cn` passes, which outrank your own settings files.
   - The key arrives only through an `apiKeyHelper` that reads it from the child's environment. This means your own `apiKeyHelper` or settings `env` block can't send another credential to Concentrate.
+  - A login made with `/login` inside `cn claude` is never used: `cn`'s `apiKeyHelper` outranks it.
 - **The model catalog is untrusted input.** Names are stripped of terminal control characters (no escape-sequence injection), and IDs that could pass for a command-line flag are dropped.
 - **Remembering a model** only reads the session `cn` started:
   - Claude gets a pinned session ID. Pi owns its session IDs and cn does not read them to remember models.
@@ -17,7 +18,7 @@ Not prevented: the coding agent itself runs commands with that environment, so a
 
 ## Permanent configuration
 
-Claude uses a command-backed `apiKeyHelper` that resolves the saved key at request time. Codex and Pi hold the key itself in their own config (`experimental_bearer_token` in `~/.codex/config.toml`, `apiKey` in Pi’s `models.json`), written with mode `0600`. OpenCode references a separate private key file through its native file substitution. `cn key` rotates each copy that cn still manages and leaves a hand-edited one alone. `cn logout` resets the Codex, OpenCode, Pi, and Cursor integrations so no copy of the key remains.
+Claude uses a command-backed `apiKeyHelper` that resolves the saved key at request time. Codex and Pi hold the key itself in their own config (`experimental_bearer_token` in `~/.codex/config.toml`, `apiKey` in Pi’s `models.json`), written with mode `0600`. OpenCode references a separate private key file through its native file substitution. `cn key` rotates each copy that cn still manages and leaves a hand-edited one alone. `cn logout` resets the Codex, OpenCode, Pi, Cursor, and GitHub Copilot app integrations so no copy of the key remains.
 
 Restore records can contain the previous tool configuration, including secrets that were already there. They are stored in private directories (mode `0700`) as files restricted to mode `0600`. Reset removes a completed restore record; if user edits require keeping files, it retains the record for recovery and reports the edits. Native Configure does not change shell startup files or replace tool executables.
 
@@ -42,3 +43,14 @@ was edited or encrypted after Configure, Reset preserves it and reports that it
 needs review. Logout removes cn's saved key only after attempting to reset the
 native static-key integrations; preserving an edited credential is reported and
 does not revoke that credential at the API.
+
+## GitHub Copilot app
+
+cn adds its own provider to the app's SQLite database (`~/.copilot/data.db`, or
+`$COPILOT_HOME/data.db`). The key is stored in that provider's `headersJson`
+setting as an `Authorization` header, with `authKind: "none"`, rather than in the
+macOS keychain. The database and existing WAL/SHM files are restricted to mode
+`0600`, and SQL is passed over stdin with escaped literals. The restore record in
+cn's private config directory holds only the provider id, never the key. Reset
+and Logout delete that provider and its models; other providers are untouched.
+The app must be closed during setup, key rotation, and Reset.

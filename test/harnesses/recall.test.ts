@@ -11,6 +11,7 @@ const CATALOG = [
   {
     id: "claude-sonnet-4-6",
     name: "Sonnet",
+    released: "2026-02-17",
     claude: true,
     codex: true,
     chat_candidate: true,
@@ -37,7 +38,7 @@ function rig({ catalog = true } = {}) {
   const codexHome = env.CODEX_HOME;
   if (catalog)
     writeJson(path.join(config, "catalog.json"), {
-      version: 6,
+      version: 7,
       fetchedAt: Date.now() / 1000,
       models: CATALOG,
     });

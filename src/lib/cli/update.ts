@@ -2,10 +2,10 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { CnError, EXIT } from "../errors.js";
+import { AppOpenError, CnError, EXIT } from "../errors.js";
 import type { Environment } from "../types.js";
 import { errorMessage, record } from "../validation.js";
-import { listHarnesses } from "../harnesses/registry.js";
+import { listConfigurableTools } from "../harnesses/configurable-tools.js";
 import {
   configDir,
   readStoredKeyOrNull,
@@ -186,20 +186,33 @@ export async function offerUpdate(env: Environment = process.env) {
 // Rewrites each permanently configured tool with the current model list and
 // prices. A tool whose settings were edited by hand is left alone.
 export async function refreshConfiguredTools(env: Environment = process.env) {
-  const tools = listHarnesses()
-    .map((h) => h.id)
-    .filter((id) => toolConfigured(id, env));
-  if (!tools.length) return 0;
+  let problems = 0;
+  const tools = listConfigurableTools()
+    .map((tool) => tool.id)
+    .filter((id) => {
+      try {
+        return toolConfigured(id, env);
+      } catch (error) {
+        problems += 1;
+        console.log(`Could not refresh ${id}: ${errorMessage(error)}`);
+        return false;
+      }
+    });
+  if (!tools.length) return problems ? 1 : 0;
   if (!readStoredKeyOrNull(env)) {
     console.log("No saved key, so configured tools were not refreshed.");
     return 0;
   }
-  let problems = 0;
   for (const id of tools) {
     try {
       await reconfigureTool(id, env);
       console.log(`Refreshed ${id} with the latest models.`);
     } catch (error) {
+      // An open app is skipped, not a failure, so cn update still succeeds.
+      if (error instanceof AppOpenError) {
+        console.log(`Skipped ${id}: it is open. Quit it and run cn refresh.`);
+        continue;
+      }
       problems += 1;
       console.log(`Could not refresh ${id}: ${errorMessage(error)}`);
     }

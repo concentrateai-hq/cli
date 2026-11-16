@@ -1,8 +1,13 @@
-import { isConfigurableTool } from "../harnesses/configurable-tools.js";
-import { CURSOR_NOTICE } from "../config/cursor-config.js";
+import {
+  DESKTOP_APPS,
+  isConfigurableTool,
+  isDesktopApp,
+} from "../harnesses/configurable-tools.js";
 import type { Environment, HarnessId } from "../types.js";
 import {
+  askBaaOnce,
   offerCodexResume,
+  runBaa,
   runDoctor,
   runKey,
   runLogout,
@@ -34,17 +39,19 @@ Usage:
       tools: ${listHarnesses()
         .map((h) => h.id)
         .join(", ")}
-  cn <tool> resume [<session-id>]            Resume a saved local conversation
-  cn opencode --session <id>                Resume an OpenCode conversation
-  cn <tool> continue                         Continue the latest project conversation
+  cn <tool> resume [<session-id>]             Resume a saved local conversation
+  cn opencode --session <id>                  Resume an OpenCode conversation
+  cn <tool> continue                          Continue the latest project conversation
   cn setup [--no-verify] [--models]           Save your API key (--models also picks defaults)
-  cn configure <tool>                       Connect a coding tool to Concentrate
-  cn reset <tool>                           Remove Concentrate setup from a coding tool
-  cn configure cursor                      Connect Cursor desktop (quit Cursor first)
-  cn settings                              Open interactive settings
+  cn configure <tool>                         Connect a coding tool to Concentrate
+  cn reset <tool>                             Remove Concentrate setup from a coding tool
+  cn configure cursor                         Connect Cursor desktop (quit Cursor first)
+  cn configure copilot                        Connect the GitHub Copilot app (quit it first)
+  cn settings                                 Open interactive settings
   cn config                                   Show key status and default models
   cn key [--no-verify]                        Replace the saved API key
   cn logout                                   Remove the saved API key
+  cn baa [on|off]                             Show only models covered by a BAA
   cn reset [--yes] [--sessions]               Clear everything cn saved and start fresh
   cn model [<tool> [<model-id>]]              Show or change default models
   cn models [<tool>] [--search <text>] [--refresh] [--limit <n>]
@@ -161,6 +168,7 @@ async function dispatch(argv: string[], env: Environment) {
   }
   if (!command && interactive(env)) {
     if (await offerUpdate(env)) return 0;
+    if (!needsSetup(env)) await askBaaOnce(env);
     return runLauncher(env);
   }
   if (
@@ -191,6 +199,7 @@ async function dispatch(argv: string[], env: Environment) {
       await runSetup({}, env);
       console.log();
     }
+    if (!needsSetup(env)) await askBaaOnce(env);
     if (command === "codex" && which(adapter.binary, env.PATH))
       await offerCodexResume(env);
     return launch(command, parseHarnessLaunchArgs(command, rest), env);
@@ -202,10 +211,11 @@ async function dispatch(argv: string[], env: Environment) {
       const target = positionals[0];
       if (!target || !isConfigurableTool(target) || positionals.length !== 1)
         throw usageError("Choose one tool: cn configure <tool>");
-      if (target === "cursor") console.log(CURSOR_NOTICE);
       const file = await configureTool(target, env);
       console.log(
-        `Configured ${target}. Restart the tool to use Concentrate. Configuration: ${file}`,
+        isDesktopApp(target)
+          ? ledger("ok", target, DESKTOP_APPS[target].done)
+          : `Configured ${target}. Restart the tool to use Concentrate. Configuration: ${file}`,
       );
       return 0;
     }
@@ -246,9 +256,11 @@ async function dispatch(argv: string[], env: Environment) {
           );
         const result = resetTool(target, env);
         console.log(
-          result.reset
-            ? `Concentrate setup removed from ${target}. Restart the tool. Connections set separately in your shell still apply.`
-            : `${target} has no Concentrate setup added by cn to remove.`,
+          result.reset && isDesktopApp(target)
+            ? ledger("ok", target, DESKTOP_APPS[target].reset)
+            : result.reset
+              ? `Concentrate setup removed from ${target}. Restart the tool. Connections set separately in your shell still apply.`
+              : `${target} has no Concentrate setup added by cn to remove.`,
         );
         for (const field of result.preserved)
           console.log(`Kept your edit: ${field}`);
@@ -258,6 +270,11 @@ async function dispatch(argv: string[], env: Environment) {
         { yes: Boolean(flags.yes), sessions: Boolean(flags.sessions) },
         env,
       );
+    }
+    case "baa": {
+      const { positionals } = parseFlags(rest);
+      if (positionals.length > 1) throw usageError("Use cn baa [on|off]");
+      return runBaa({ value: positionals[0] }, env);
     }
     case "logout":
       return runLogout(env);

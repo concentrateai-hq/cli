@@ -1,16 +1,20 @@
 import {
   configurableTool,
+  DESKTOP_APPS,
+  isDesktopApp,
   listConfigurableTools,
 } from "../harnesses/configurable-tools.js";
-import { CURSOR_NOTICE } from "../config/cursor-config.js";
 import type {
   ConfigurableToolId,
+  DesktopAppId,
   Environment,
   HarnessId,
   MenuItem,
   TerminalCapabilities,
 } from "../types.js";
 import {
+  askBaa,
+  askBaaOnce,
   browseModels,
   runDoctor,
   runSetup,
@@ -23,6 +27,7 @@ import { getHarness, listHarnesses } from "../harnesses/registry.js";
 import { validateKey } from "../catalog.js";
 import {
   needsSetup,
+  readBaa,
   readPreferences,
   resolveKeyOrNull,
   writeKey,
@@ -35,7 +40,7 @@ import {
   configureTool,
   refreshConfiguredKey,
   resetTool,
-  toolConfigured,
+  toolConfiguredOrFalse,
 } from "../harnesses/tool-config.js";
 import { CnError } from "../errors.js";
 import { errorMessage } from "../validation.js";
@@ -125,14 +130,13 @@ export function menuItems(env: Environment, c = caps()) {
           "Pick a saved session and continue it through Concentrate on the tool's default model. Requests are billed at API rates.",
       },
       { group: "desktop" },
-      {
-        value: "desktop:cursor",
-        label: "cursor",
-        note: "Cursor desktop",
+      ...Object.values(DESKTOP_APPS).map((app) => ({
+        value: `desktop:${app.id}`,
+        label: app.id,
+        note: app.label,
         meta: "Configure / Reset",
-        about:
-          "Connect Cursor desktop to Concentrate or remove its setup. Open Cursor normally afterward. Quit Cursor before changing its configuration.",
-      },
+        about: `Connect ${app.label} to Concentrate or remove its setup. Open it normally afterward. Quit it before changing its configuration.`,
+      })),
       { group: "manage" },
       ...MANAGE,
     ],
@@ -173,7 +177,7 @@ async function action(
 
 type IntegrationAction = "configure" | "reset";
 
-async function integrateTool(
+export async function integrateTool(
   operation: IntegrationAction,
   target: ConfigurableToolId,
   env: Environment,
@@ -185,7 +189,9 @@ async function integrateTool(
       ledger(
         "ok",
         tool.label,
-        `Concentrate connected. Open the tool normally after restarting it. Settings file: ${file}`,
+        isDesktopApp(target)
+          ? DESKTOP_APPS[target].done
+          : `Concentrate connected. Open the tool normally after restarting it. Settings file: ${file}`,
       ),
     );
   } else {
@@ -195,15 +201,19 @@ async function integrateTool(
         result.reset ? "ok" : "mute",
         tool.label,
         result.reset
-          ? "Concentrate setup removed. Restart the tool."
+          ? isDesktopApp(target)
+            ? DESKTOP_APPS[target].reset
+            : "Concentrate setup removed. Restart the tool."
           : "No Concentrate setup added by cn to remove.",
       ),
     );
     for (const field of result.preserved)
       console.log(`Kept your edit: ${field}`);
-    console.log(
-      "A Concentrate connection set separately in your shell can still apply.",
-    );
+    // Desktop apps never read the shell's environment.
+    if (!isDesktopApp(target))
+      console.log(
+        "A Concentrate connection set separately in your shell can still apply.",
+      );
   }
 }
 
@@ -221,7 +231,7 @@ async function integrationPicker(
           ...listConfigurableTools().map((tool) => ({
             value: tool.id,
             label: tool.label,
-            note: toolConfigured(tool.id, env)
+            note: toolConfiguredOrFalse(tool.id, env)
               ? operation === "configure"
                 ? "Configured · refresh saved settings"
                 : "Remove this tool’s Concentrate setup"
@@ -234,8 +244,8 @@ async function integrationPicker(
         detail: (item) =>
           item.value === "back"
             ? ["Return to the home menu."]
-            : item.value === "cursor"
-              ? [CURSOR_NOTICE]
+            : item.value && isDesktopApp(item.value)
+              ? [DESKTOP_APPS[item.value].notice]
               : [
                   operation === "configure"
                     ? "Saves Concentrate connection and model settings. The tool’s normal command will use your saved Concentrate key. Restart the tool afterward."
@@ -259,15 +269,16 @@ async function toolSettings(
   backNote = "Return to Settings",
 ) {
   const tool = configurableTool(target);
-  let initial = target === "cursor" ? "configure" : "model";
+  const desktop = isDesktopApp(target);
+  let initial = desktop ? "configure" : "model";
   for (;;) {
-    const configured = toolConfigured(target, env);
+    const configured = toolConfiguredOrFalse(target, env);
     const choice = await select(
       {
         title: `${tool.label} settings`,
         initial,
         items: [
-          ...(target === "cursor"
+          ...(desktop
             ? []
             : [
                 {
@@ -293,8 +304,8 @@ async function toolSettings(
           { value: "back", label: "Back", note: backNote },
         ],
         detail: (item) => [
-          target === "cursor"
-            ? CURSOR_NOTICE
+          desktop
+            ? DESKTOP_APPS[target].notice
             : item.value === "configure"
               ? `Saves Concentrate connection and model settings so this tool’s normal command uses your saved Concentrate key. Restart the tool afterward.`
               : item.value === "reset"
@@ -308,7 +319,7 @@ async function toolSettings(
     initial = choice.value;
     await action(
       () =>
-        choice.value === "model" && target !== "cursor"
+        choice.value === "model" && !desktop
           ? runModel({ target }, env)
           : integrateTool(choice.value as IntegrationAction, target, env),
       env,
@@ -329,14 +340,22 @@ export async function runSettings(env: Environment = process.env) {
           ...listConfigurableTools().map((tool) => ({
             value: tool.id,
             label: tool.label,
-            note: `${tool.id === "cursor" ? "Choose models inside Cursor" : preferences[tool.id]}${toolConfigured(tool.id, env) ? " · configured" : ""}`,
-            about:
-              tool.id === "cursor"
-                ? CURSOR_NOTICE
-                : `Choose a default model, connect this tool to Concentrate, or remove its Concentrate setup for ${tool.label}.`,
+            note: `${isDesktopApp(tool.id) ? "Choose models inside the app" : preferences[tool.id]}${toolConfiguredOrFalse(tool.id, env) ? " · configured" : ""}`,
+            about: isDesktopApp(tool.id)
+              ? DESKTOP_APPS[tool.id].notice
+              : `Choose a default model, connect this tool to Concentrate, or remove its Concentrate setup for ${tool.label}.`,
           })),
           { group: "account" },
           { value: "key", label: "API key", note: "Save or replace your key" },
+          {
+            value: "baa",
+            label: "BAA models",
+            note: readBaa(env)
+              ? "On · BAA-covered models only"
+              : "Off · every model",
+            about:
+              "Choose Yes if your organization has a BAA with Concentrate AI. Model lists then show only models covered by it.",
+          },
           {
             value: "config",
             label: "Configuration",
@@ -353,12 +372,13 @@ export async function runSettings(env: Environment = process.env) {
     );
     if (choice.cancel || choice.value === "back") return 0;
     initial = choice.value;
-    if (choice.value !== "key" && choice.value !== "config") {
+    if (!["key", "config", "baa"].includes(choice.value)) {
       await toolSettings(choice.value as ConfigurableToolId, env);
       continue;
     }
     await action(() => {
       if (choice.value === "key") return runKey({}, env);
+      if (choice.value === "baa") return askBaa(env);
       return showConfig(env);
     }, env);
   }
@@ -498,6 +518,7 @@ async function launcher(
           if ("key" in result) {
             writeKey(result.key, env);
             refreshConfiguredKey(env);
+            await askBaaOnce(env);
           }
         } catch (error) {
           clearScreen("Unable to continue");
@@ -544,8 +565,12 @@ async function launcher(
             env,
           );
       } else if (choice.value === "resume") await resumePicker(env, screen);
-      else if (choice.value === "desktop:cursor")
-        await toolSettings("cursor", env, "Return to home");
+      else if (choice.value.startsWith("desktop:"))
+        await toolSettings(
+          choice.value.slice(8) as DesktopAppId,
+          env,
+          "Return to home",
+        );
       else if (choice.value === "configure" || choice.value === "reset")
         await integrationPicker(choice.value, env);
       else if (choice.value === "settings") await runSettings(env);

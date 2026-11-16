@@ -16,7 +16,9 @@ import time
 master, slave = pty.openpty()
 fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 100, 0, 0))
 with tempfile.TemporaryDirectory(prefix='cn-navigation-') as directory:
-    env = {**os.environ, 'CN_CONFIG_HOME': directory, 'CN_OFFLINE': '1',
+    with open(os.path.join(directory, 'config.json'), 'w') as file:
+        file.write('{"baa": false}')  # answered, so startup goes straight to the menu
+    env = {**os.environ, 'HOME': directory, 'CN_CONFIG_HOME': directory, 'CN_OFFLINE': '1',
            'CN_NO_MOTION': '1', 'NO_COLOR': '1', 'TERM': 'xterm-256color',
            'CN_NO_UPDATE_CHECK': '1', 'CONCENTRATE_API_KEY': 'sk-navigation-test', 'PATH': directory}
     child = subprocess.Popen([sys.argv[1], sys.argv[2]], stdin=slave, stdout=slave,
@@ -81,16 +83,16 @@ with tempfile.TemporaryDirectory(prefix='cn-navigation-') as directory:
         assert 'sk-navigation-test' not in transcript, 'Key leaked'
         press('\r')
         expect('TOOLS')
-        press('\x1b[F\x1b[A\x1b[A\r')  # API key prompt
+        press('\x1b[F\x1b[A\x1b[A\x1b[A\r')  # API key prompt
         expect('Enter saves CONCENTRATE_API_KEY')
         press('\x1b')  # Esc backs out to Settings instead of ignoring it or quitting cn
         expect('TOOLS')
         assert child.poll() is None, 'Cancelling the key prompt closed cn'
         press('\x1b')
         expect('quit')
-        press('\x1b[H' + '\x1b[B' * 6 + '\r')  # Home Configure
+        press('\x1b[H' + '\x1b[B' * 7 + '\r')  # Home Configure
         expect('Configure a tool')
-        press('\x1b[F\x1b[A')  # Cursor desktop
+        press('\x1b[F\x1b[A\x1b[A')  # Cursor desktop
         expect("Cursor's servers")
         press('\r')  # Needs a saved key; remain inside cn
         expect('Return to the previous menu')
@@ -103,7 +105,7 @@ with tempfile.TemporaryDirectory(prefix='cn-navigation-') as directory:
         expect('Configure a tool')
         press('\x1b')
         expect('quit')
-        press('\x1b[H' + '\x1b[B' * 7 + '\r')  # Home Reset
+        press('\x1b[H' + '\x1b[B' * 8 + '\r')  # Home Reset
         expect('Reset a tool')
         press('\r')  # No managed integration to reset
         expect('Return to the previous menu')
@@ -156,7 +158,9 @@ for termination in ('ctrl-c', 'sigterm'):
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 80, 0, 0))
     with tempfile.TemporaryDirectory(prefix='cn-exit-') as directory:
-        env = {**os.environ, 'CN_CONFIG_HOME': directory, 'CN_OFFLINE': '1',
+        with open(os.path.join(directory, 'config.json'), 'w') as file:
+            file.write('{"baa": false}')
+        env = {**os.environ, 'HOME': directory, 'CN_CONFIG_HOME': directory, 'CN_OFFLINE': '1',
                'CN_NO_MOTION': '1', 'NO_COLOR': '1', 'TERM': 'xterm-256color',
                'CN_NO_UPDATE_CHECK': '1', 'CONCENTRATE_API_KEY': 'sk-exit-test'}
         child = subprocess.Popen([sys.argv[1], sys.argv[2]], stdin=slave, stdout=slave, stderr=slave, env=env)

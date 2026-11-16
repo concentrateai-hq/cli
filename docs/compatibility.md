@@ -81,7 +81,9 @@ cn updates `useOpenAIKey`, `openAIBaseUrl`, `aiSettings.userAddedModels`, and
 `aiSettings.modelOverrideEnabled` in Cursor's `User/globalStorage/state.vscdb`.
 The base URL is `https://api.concentrate.ai/v1`; Concentrate's Chat Completions
 route already adapts Cursor's flat tools and `tool_choice: validated` format.
-Only catalog models marked as supporting tool calls are added. Existing custom
+Only catalog models marked as supporting tool calls are added, except Claude
+models: Cursor sends them through Chat Completions without a cache hint, so they
+would not be cached. Existing custom
 models and disabled-model preferences are kept. Choose models inside Cursor;
 cn does not set their context windows, output caps, or reasoning controls.
 The catalog is currently public, not filtered by account/key policies.
@@ -108,3 +110,31 @@ editor testing remains outstanding.
 
 Validation covers fixture databases and a Cursor-format gateway request. A full
 Cursor desktop session has not been tested on this machine.
+
+## GitHub Copilot app
+
+`cn configure copilot` configures the GitHub Copilot desktop app on macOS. It
+requires an initialized app profile (`~/.copilot/data.db`, or `$COPILOT_HOME`),
+a saved Concentrate API key, `sqlite3`, and `pgrep`. Quit the app first; cn checks
+for its `github` process instead of terminating it.
+
+cn inserts one `custom` row into `model_providers`, named "Concentrate AI",
+with `baseUrl` `https://api.concentrate.ai/v1`, `wireApi: "completions"`,
+`authKind: "none"`, and a `headersJson` string carrying the `Authorization` and
+`X-App: copilot` headers. Each catalog model that supports tool calls becomes a
+`provider_models` row: id and wire model from the catalog id, display name,
+context and output limits, vision support, and `supported_reasoning_efforts` as a
+JSON array limited to the levels the app accepts (`low`, `medium`, `high`,
+`xhigh`, `max`). Claude models get `wire_api_override: "responses"`, which they
+need for prompt caching. Other models stay on Chat Completions because on the
+Responses API the app sends a `tool_search` tool that Concentrate does not accept
+yet.
+
+The provider id is kept in cn's restore record. Configure again replaces that
+provider's models with the current catalog, recreating the provider if it was
+deleted in the app. Reset, Logout, and global Reset delete only that provider and
+its models; a provider added in the app's own settings is never changed. `cn key`
+rewrites its header while the app is closed. Windows and Linux are not supported.
+
+Validation covers fixture databases built from the app's schema. A full app
+session through Concentrate has not been tested yet.

@@ -18,6 +18,10 @@ export const CODEX_TEMPLATE = {
   future_catalog_field: { preserved: true },
 };
 
+/** A fetch Response with a JSON body, for vi.stubGlobal("fetch", ...). */
+export const json = (body, status = 200) =>
+  new Response(JSON.stringify(body), { status });
+
 export function tempDir(prefix = "cn-test-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
@@ -73,7 +77,7 @@ export function runCn(args, { env = {}, input } = {}) {
     input,
     env: {
       PATH: path.dirname(process.execPath),
-      HOME: os.homedir(),
+      HOME: tempDir("cn-home-"),
       CN_OFFLINE: "1",
       ...env,
     },
@@ -95,6 +99,7 @@ export function setup(extraEnv = {}) {
     config,
     env: {
       PATH: `${bin}:${nodeDir}`,
+      HOME: tempDir("cn-home-"),
       CN_CONFIG_HOME: config,
       CONCENTRATE_API_KEY: "sk-test",
       // Never read the developer's real Codex config.
@@ -102,4 +107,13 @@ export function setup(extraEnv = {}) {
       ...extraEnv,
     },
   };
+}
+
+// A fresh catalog cache in a cn config directory.
+export function writeCatalog(config, models) {
+  fs.writeFileSync(
+    path.join(config, "catalog.json"),
+    JSON.stringify({ version: 6, fetchedAt: Date.now() / 1000, models }),
+    { mode: 0o600 },
+  );
 }

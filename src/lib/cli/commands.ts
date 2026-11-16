@@ -7,6 +7,7 @@ import type {
   Harness,
   HarnessId,
   Model,
+  Preferences,
   TerminalCapabilities,
 } from "../types.js";
 import {
@@ -28,9 +29,9 @@ import {
 } from "../harnesses/tool-config.js";
 import fs from "node:fs";
 import path from "node:path";
-import { CnError } from "../errors.js";
+import { CnError, EXIT } from "../errors.js";
 import { errorMessage } from "../validation.js";
-import { isApiKey } from "../safe.js";
+import { isApiKey, isOpenAiModel } from "../safe.js";
 import { getHarness, listHarnesses } from "../harnesses/registry.js";
 import { which } from "./launch.js";
 import { ask, askHidden } from "./prompt.js";
@@ -39,6 +40,11 @@ import {
   deleteStoredKey,
   HARNESS_IDS,
   readPreferences,
+  newestInTier,
+  readBaa,
+  writeBaa,
+  CLAUDE_SONNET,
+  DEEPSEEK_FLASH,
   environmentKey,
   readStoredKey,
   readStoredKeyOrNull,
@@ -54,10 +60,8 @@ import { modelItem, modelLegend, modelRight } from "../ui/models.js";
 import { caps, pad, paint } from "../ui/term.js";
 import { glyphs } from "../ui/theme.js";
 import { interactive, password, select, spinner } from "../ui/widgets.js";
-import { updateNotice } from "./update.js";
+import { refreshConfiguredTools, updateNotice } from "./update.js";
 import { version } from "../version.js";
-
-const SUGGESTED_MODELS = ["claude-sonnet-4-6", "deepseek-v4-1-flash"];
 
 // ---- helpers shared by commands -------------------------------------------------
 
@@ -101,9 +105,12 @@ async function promptModelPlain(
   const byId = new Map(available.map((m) => [m.id, m]));
   const suggestions = [
     ...new Set(
-      [current, ...SUGGESTED_MODELS, ...available.map((m) => m.id)].filter(
-        (id) => id === current || byId.has(id),
-      ),
+      [
+        current,
+        newestInTier(CLAUDE_SONNET, catalog),
+        newestInTier(DEEPSEEK_FLASH, catalog),
+        ...available.map((m) => m.id),
+      ].filter((id) => id === current || byId.has(id ?? "")),
     ),
   ].slice(0, 5);
   console.log(`\n${getHarness(harnessId).label} default model`);
@@ -113,7 +120,7 @@ async function promptModelPlain(
   console.log("Type a model ID or ?search to browse the catalog.");
   for (;;) {
     const answer = await ask(`Select [Enter keeps ${current}]: `);
-    if (!answer) return current;
+    if (!answer) return null;
     if (/^\d+$/.test(answer)) {
       const picked = suggestions[Number(answer) - 1];
       if (picked) return picked;
@@ -295,6 +302,7 @@ export async function runSetup(
   } else {
     console.log(ledger("warn", "key", "saved without a live check", c));
   }
+  await askBaaOnce(env);
   const models = readPreferences(env);
   if (customize) {
     let catalog: Model[] = [];
@@ -317,13 +325,15 @@ export async function runSetup(
         ),
       );
     }
+    const chosen: Partial<Preferences> = {};
     for (const id of HARNESS_IDS) {
-      models[id] = (await chooseModel(id, models[id], catalog)) ?? models[id];
+      const pick = await chooseModel(id, models[id], catalog);
+      if (pick !== null) chosen[id] = pick;
       console.log(
-        ledger("ok", getHarness(id as HarnessId).label, models[id], c),
+        ledger("ok", getHarness(id as HarnessId).label, pick ?? models[id], c),
       );
     }
-    writePreferences(models, env);
+    writePreferences(chosen, env);
   }
   if (persist) {
     writeKey(key, env);
@@ -363,13 +373,72 @@ export async function runKey(
       verify ? "key stored" : "key stored without a live check",
     ),
   );
+  await askBaaOnce(env);
+  return 0;
+}
+
+// Asked once, the first time cn has a key; cn baa or Settings changes it later.
+export async function askBaaOnce(env: Environment = process.env) {
+  if (readBaa(env) === null) await askBaa(env);
+}
+
+export async function askBaa(env: Environment = process.env) {
+  if (!interactive(env)) return;
+  const choice = await select({
+    title: "Does your organization have a BAA with Concentrate AI?",
+    initial: readBaa(env) ? "yes" : "no",
+    items: [
+      { value: "no", label: "No", note: "Show every model" },
+      { value: "yes", label: "Yes", note: "Show only BAA-covered models" },
+    ],
+    hints: [
+      ["↑↓", "move"],
+      ["↵", "choose"],
+      ["esc", "keep current"],
+    ],
+  });
+  // Esc on the first ask counts as No, so it is still asked only once.
+  if (choice.cancel) {
+    if (readBaa(env) === null) writeBaa(false, env);
+    return;
+  }
+  await setBaa(choice.value === "yes", env);
+}
+
+async function setBaa(baa: boolean, env: Environment) {
+  const changed = baa !== Boolean(readBaa(env));
+  writeBaa(baa, env);
+  console.log(
+    ledger(
+      "ok",
+      "BAA",
+      baa
+        ? "on, only BAA-covered models are shown"
+        : "off, every model is shown",
+    ),
+  );
+  if (changed) await refreshConfiguredTools(env);
+}
+
+/** cn baa [on|off]: show or change whether only BAA-covered models are shown. */
+export async function runBaa(
+  { value }: { value?: string },
+  env: Environment = process.env,
+) {
+  if (value === "on" || value === "off") {
+    await setBaa(value === "on", env);
+    return 0;
+  }
+  if (value !== undefined) throw new CnError("Use cn baa on or cn baa off.", 2);
+  if (interactive(env)) await askBaa(env);
+  else console.log(ledger("info", "BAA", readBaa(env) ? "on" : "off"));
   return 0;
 }
 
 export function runLogout(env: Environment = process.env) {
   // Removing the key comes first in importance: a tool that cannot be reset
   // (Cursor running, a damaged config) must not keep the saved key on disk.
-  for (const id of ["opencode", "pi", "codex", "cursor"] as const) {
+  for (const id of ["opencode", "pi", "codex", "cursor", "copilot"] as const) {
     const label = configurableTool(id).label;
     try {
       if (!toolConfigured(id, env)) continue;
@@ -416,9 +485,17 @@ export async function runReset(
 ) {
   const c = caps();
   const targets = resetTargets(env, { sessions });
-  const configured = listConfigurableTools().filter((tool) =>
-    toolConfigured(tool.id, env),
-  );
+  // A tool whose settings cannot be read is reported, not allowed to stop the reset.
+  const configured = listConfigurableTools().filter((tool) => {
+    try {
+      return toolConfigured(tool.id, env);
+    } catch (error) {
+      console.log(
+        ledger("warn", tool.label, `not checked: ${errorMessage(error)}`, c),
+      );
+      return false;
+    }
+  });
   if (!targets.length && !configured.length) {
     console.log(ledger("mute", "reset", "nothing saved, already fresh", c));
     return 0;
@@ -489,6 +566,13 @@ export function showConfig(env: Environment = process.env) {
   console.log(ledger("mute", "config", configDir(env)));
   console.log(ledger(key ? "ok" : "bad", "api key", source));
   console.log(ledger("info", "routing", "automatic"));
+  console.log(
+    ledger(
+      "info",
+      "BAA",
+      readBaa(env) ? "on (BAA-covered models only)" : "off",
+    ),
+  );
   for (const [id, model] of Object.entries(readPreferences(env))) {
     console.log(
       ledger(
@@ -501,31 +585,59 @@ export function showConfig(env: Environment = process.env) {
   return 0;
 }
 
+// A typed model must be one the tool can use. Without a catalog (offline, no
+// cache) the ID is saved as given; the picker still accepts custom IDs.
+async function checkModelChoice(
+  target: HarnessId,
+  id: string,
+  env: Environment,
+) {
+  if (target === "codex" && !isOpenAiModel(id))
+    throw new CnError(
+      `Codex supports OpenAI models only for now. Run cn models codex to see them.`,
+      EXIT.USAGE,
+    );
+  let catalog: Model[];
+  try {
+    catalog = (await fetchCatalog({ env })).models;
+  } catch {
+    return;
+  }
+  if (!catalog.length) return;
+  const known = modelsFor(target, catalog).some(
+    (m) => m.id === id || m.variants?.some((v) => v.id === id),
+  );
+  if (known) return;
+  const which = readBaa(env) ? "BAA-covered model" : "model";
+  throw new CnError(
+    `No ${which} named ${id} for ${getHarness(target).label}. Run cn models ${target} to see the list.`,
+    EXIT.USAGE,
+  );
+}
+
 export async function runModel(
   { target, modelId }: { target?: HarnessId; modelId?: string },
   env: Environment = process.env,
 ) {
   if (!target) return showConfig(env);
-  const models = readPreferences(env);
-  if (modelId) {
-    models[target] = modelId;
-  } else {
+  let pick = modelId;
+  if (pick) await checkModelChoice(target, pick, env);
+  else {
     let catalog: Model[] = [];
     try {
       catalog = (await fetchCatalog({ env })).models;
     } catch {
       // continue with an empty catalog; the user can still type an ID
     }
-    const chosen = await chooseModel(target, models[target], catalog);
+    const current = readPreferences(env)[target];
+    const chosen = await chooseModel(target, current, catalog);
     if (chosen === null) {
-      console.log(
-        ledger("mute", getHarness(target).label, `kept ${models[target]}`),
-      );
+      console.log(ledger("mute", getHarness(target).label, `kept ${current}`));
       return 0;
     }
-    models[target] = chosen;
+    pick = chosen;
   }
-  writePreferences(models, env);
+  writePreferences({ [target]: pick }, env);
   if (toolConfigured(target, env)) {
     try {
       await reconfigureTool(target, env);
@@ -539,9 +651,7 @@ export async function runModel(
       );
     }
   }
-  console.log(
-    ledger("ok", getHarness(target).label, `default model ${models[target]}`),
-  );
+  console.log(ledger("ok", getHarness(target).label, `default model ${pick}`));
   return 0;
 }
 
