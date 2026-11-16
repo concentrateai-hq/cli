@@ -108,6 +108,12 @@ Newer Codex versions won't move a conversation you started in plain `codex`
 start a new one with `cn codex`. Conversations started with `cn codex` resume
 normally. A fix is planned for the next `cn` release.
 
+**`cn codex` is slow to answer**
+If your Codex is signed in with a ChatGPT account that has apps connected,
+Codex sends every app's tools with each message. With many apps this makes each
+answer take 10–20 seconds through Concentrate. Disconnecting apps you don't use
+in ChatGPT helps. A fix is planned.
+
 **The Codex app shows no Concentrate models**
 Quit the app and open it again after `cn configure codex`. The app and the
 command line share `~/.codex/config.toml`.
@@ -197,6 +203,8 @@ folder it names, then try again.
 - GitHub Copilot app: macOS only.
 - Codex: a conversation started in plain `codex` can't be resumed through
   `cn codex` on newer Codex versions. See the Codex section above.
+- Codex: answers can be slow when your ChatGPT account has many apps
+  connected. See the Codex section above.
 - Claude Code: plugins, MCP servers, skills, or memory edits you add inside
   `cn claude` don't stay after you quit. Add them in normal `claude` instead;
   `cn claude` picks them up on its next launch.
