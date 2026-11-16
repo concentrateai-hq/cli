@@ -100,9 +100,13 @@ The Concentrate section of `~/.codex/config.toml` came from an older `cn`. Run
 
 **Using your ChatGPT subscription and Concentrate**
 Run `codex` for your subscription and `cn codex` for Concentrate. `cn` does not
-change your Codex login or default. `cn codex resume` can continue a
-subscription conversation through Concentrate; new requests then use your API
-key and API billing.
+change your Codex login or default.
+
+**`Cannot change this thread's model provider from openai to concentrate on resume`**
+Newer Codex versions won't move a conversation you started in plain `codex`
+(on your ChatGPT login) over to Concentrate. Continue it with plain `codex`, or
+start a new one with `cn codex`. Conversations started with `cn codex` resume
+normally. A fix is planned for the next `cn` release.
 
 **The Codex app shows no Concentrate models**
 Quit the app and open it again after `cn configure codex`. The app and the
@@ -191,6 +195,8 @@ folder it names, then try again.
 - Cursor: work in progress, not tested in a full desktop session. Claude models
   are left out until they can be cached.
 - GitHub Copilot app: macOS only.
+- Codex: a conversation started in plain `codex` can't be resumed through
+  `cn codex` on newer Codex versions. See the Codex section above.
 - Claude Code: plugins, MCP servers, skills, or memory edits you add inside
   `cn claude` don't stay after you quit. Add them in normal `claude` instead;
   `cn claude` picks them up on its next launch.

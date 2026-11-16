@@ -72,7 +72,8 @@ shared background server does not report a closed conversation as open elsewhere
 cn does not close other Codex sessions or change your login.
 
 You can resume a locally saved conversation after reaching a subscription's
-usage limit. New model requests use your Concentrate API key and API billing;
+usage limit (except Codex for now: newer Codex versions won't move a
+subscription conversation to Concentrate; see [known issues](../ISSUES.md#codex)). New model requests use your Concentrate API key and API billing;
 your subscription login stays saved. Resuming sends the conversation context
 needed for the next request through Concentrate. This continues a session in
 the same agent; it does not transfer conversations between different agents.

@@ -157,7 +157,9 @@ cn claude continue              # Continue the latest one
 A resumed conversation starts on that tool's default model. Add `--model <id>` to
 use another. You can resume a saved conversation after hitting a subscription's
 usage limit; new requests then go through Concentrate at API rates. Choose a model
-that fits the conversation's size.
+that fits the conversation's size. Codex is the exception for now: newer versions
+won't move a subscription conversation to Concentrate (see
+[known issues](ISSUES.md#codex)).
 
 ## Use a tool's normal command
 
