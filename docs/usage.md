@@ -129,9 +129,9 @@ them too. A Codex setup that only added the Concentrate provider (for plain
 `codex resume`) stays that way when refreshed.
 
 For Cursor desktop, install and open Cursor once, then quit it before Configure or
-Reset. Select models in Cursor afterward. Claude models are not added for now,
-because Cursor reaches Concentrate only through Chat Completions, where Claude is
-not cached yet. Cursor stores your Concentrate key and
+Reset. Select models in Cursor afterward. Claude models are added as
+`concentrate/claude-…`, because Cursor keeps plain `claude-…` names for its own
+models. Cursor stores your Concentrate key and
 sends requests through Cursor’s servers; Tab completions still use Cursor’s models.
 Cursor setup requires `sqlite3` and `pgrep` (included with macOS). It configures the
 desktop editor, not the Cursor CLI.

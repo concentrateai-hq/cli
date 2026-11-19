@@ -217,10 +217,14 @@ export function configureCursor(
     const ids = [
       ...new Set(
         models
-          // Cursor reaches Concentrate only through Chat Completions, where
-          // Claude models are not cached yet, so they are left out for now.
-          .filter((model) => model.chat_candidate && !/^claude-/.test(model.id))
-          .map((model) => model.id),
+          .filter((model) => model.chat_candidate)
+          // Cursor serves claude-* names itself, so Claude goes through
+          // Concentrate's concentrate/ alias for the same model
+          .map((model) =>
+            model.id.startsWith("claude-")
+              ? `concentrate/${model.id}`
+              : model.id,
+          ),
       ),
     ];
     if (!ids.length)

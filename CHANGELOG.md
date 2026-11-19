@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `cn configure cursor` now adds Claude models, named `concentrate/claude-…`
+  so Cursor sends them to Concentrate. They are cached. Run
+  `cn configure cursor` again to add them.
+
 ## 0.1.5 (2026-11-16)
 
 - **Requires Node.js 22.13 or newer.** The installer, `cn update`, and `cn`

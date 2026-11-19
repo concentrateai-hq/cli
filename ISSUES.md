@@ -154,10 +154,10 @@ converts Pi to keep the key itself. If not, run `cn refresh`.
 - `sqlite3` is required (it ships with macOS).
 - Tab completions keep using Cursor's own models.
 
-**Claude models are missing in Cursor, or not cached**
-Cursor can only reach Concentrate through Chat Completions, where Claude models
-are not cached yet, so `cn configure cursor` leaves them out for now. If you add
-one by hand, every turn is billed in full. Use `cn claude` for Claude models.
+**Claude models are missing in Cursor**
+Run `cn configure cursor` again. Claude models are listed as
+`concentrate/claude-…`. A plain `claude-…` name you add by hand uses Cursor's
+own Claude, not Concentrate.
 
 ## GitHub Copilot app
 
@@ -209,7 +209,7 @@ folder it names, then try again.
   `cn codex` on newer Codex versions. See the Codex section above.
 - Codex: answers can be slow when your ChatGPT account has many apps
   connected. See the Codex section above.
-- Cursor: in beta. Claude models are left out until they can be cached there.
+- Cursor: in beta.
 - GitHub Copilot app: macOS only.
 - macOS and Linux only.
 - `cn` works with whatever version of each tool you have installed. If a tool
