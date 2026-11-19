@@ -110,9 +110,9 @@ Work in progress: expect changes.
 
 - `cn configure cursor` sets up the Cursor desktop editor. If Cursor is open,
   cn asks you to quit it; reopen it afterward.
-- Claude models are not added for now: Cursor can only use Chat Completions,
-  where Claude isn't cached yet, so long chats would cost much more. Use
-  `cn claude` for Claude models.
+- Models appear as `cn/<model>`, so Cursor sends them to Concentrate
+  instead of serving a model with the same name itself. Claude models are
+  included and cached.
 - Cursor stores your key and sends requests through Cursor's servers. Tab
   completions keep using Cursor's own models.
 - This sets up the editor, not the Cursor command-line tool.
