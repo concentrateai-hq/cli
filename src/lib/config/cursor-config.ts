@@ -219,8 +219,8 @@ export function configureCursor(
         models
           .filter((model) => model.chat_candidate)
           // Cursor serves names that match its own models itself, so every
-          // model goes through Concentrate's concentrate/ alias instead
-          .map((model) => `concentrate/${model.id}`),
+          // model goes through Concentrate's cn/ alias instead
+          .map((model) => `cn/${model.id}`),
       ),
     ];
     if (!ids.length)

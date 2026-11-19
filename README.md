@@ -110,7 +110,7 @@ Work in progress: expect changes.
 
 - `cn configure cursor` sets up the Cursor desktop editor. If Cursor is open,
   cn asks you to quit it; reopen it afterward.
-- Models appear as `concentrate/<model>`, so Cursor sends them to Concentrate
+- Models appear as `cn/<model>`, so Cursor sends them to Concentrate
   instead of serving a model with the same name itself. Claude models are
   included and cached.
 - Cursor stores your key and sends requests through Cursor's servers. Tab

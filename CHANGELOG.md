@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `cn configure cursor` names models `concentrate/<model>`, so Cursor sends
+- `cn configure cursor` names models `cn/<model>`, so Cursor sends
   them to Concentrate instead of serving a model with the same name itself.
   Claude models are now included and cached. Run `cn configure cursor` again;
   it replaces the models it added before and keeps your own.

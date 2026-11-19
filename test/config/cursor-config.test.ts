@@ -113,11 +113,11 @@ test("Cursor Configure again replaces the models cn wrote and keeps the user's o
   const { aiSettings } = userOf(f);
   expect(aiSettings.userAddedModels).toStrictEqual([
     "my-model",
-    "concentrate/test-tool-model",
+    "cn/test-tool-model",
   ]);
   expect(aiSettings.modelOverrideEnabled).toStrictEqual([
     "my-model",
-    "concentrate/test-tool-model",
+    "cn/test-tool-model",
   ]);
   expect(resetCursor(f.env).reset).toBe(true);
   expect(userOf(f)).toStrictEqual(initial);
@@ -133,13 +133,13 @@ test("Cursor Configure populates tool models, preserves user models, and Reset r
   expect(user.useOpenAIKey).toBe(true);
   expect(user.aiSettings.userAddedModels).toStrictEqual([
     "my-model",
-    "concentrate/test-tool-model",
-    "concentrate/claude-sonnet-5-5",
+    "cn/test-tool-model",
+    "cn/claude-sonnet-5-5",
   ]);
   expect(user.aiSettings.modelOverrideEnabled).toStrictEqual([
     "my-model",
-    "concentrate/test-tool-model",
-    "concentrate/claude-sonnet-5-5",
+    "cn/test-tool-model",
+    "cn/claude-sonnet-5-5",
   ]);
   expect(rowsOf(f).get(CURSOR_KEY_ROW)).toBe("sk-dummy");
   expect(rowsOf(f).has(CURSOR_SECRET_ROW)).toBe(false);

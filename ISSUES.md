@@ -155,7 +155,7 @@ converts Pi to keep the key itself. If not, run `cn refresh`.
 - Tab completions keep using Cursor's own models.
 
 **Claude models are missing in Cursor, or a model uses your Cursor plan**
-Run `cn configure cursor` again. Models are listed as `concentrate/<model>`. A
+Run `cn configure cursor` again. Models are listed as `cn/<model>`. A
 plain name you add by hand, such as `claude-sonnet-5-5`, can be served by
 Cursor itself instead of Concentrate.
 
