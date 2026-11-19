@@ -106,6 +106,23 @@ function edit(fixture, key, value) {
   );
 }
 
+test("Cursor Configure again replaces the models cn wrote and keeps the user's own", () => {
+  const f = fixture();
+  configureCursor(ROOT, "sk-dummy", models, f.env);
+  configureCursor(ROOT, "sk-dummy", [models[0]], f.env);
+  const { aiSettings } = userOf(f);
+  expect(aiSettings.userAddedModels).toStrictEqual([
+    "my-model",
+    "concentrate/test-tool-model",
+  ]);
+  expect(aiSettings.modelOverrideEnabled).toStrictEqual([
+    "my-model",
+    "concentrate/test-tool-model",
+  ]);
+  expect(resetCursor(f.env).reset).toBe(true);
+  expect(userOf(f)).toStrictEqual(initial);
+});
+
 test("Cursor Configure populates tool models, preserves user models, and Reset restores settings and key", () => {
   const f = fixture();
   const before = rowsOf(f);
@@ -116,12 +133,12 @@ test("Cursor Configure populates tool models, preserves user models, and Reset r
   expect(user.useOpenAIKey).toBe(true);
   expect(user.aiSettings.userAddedModels).toStrictEqual([
     "my-model",
-    "test-tool-model",
+    "concentrate/test-tool-model",
     "concentrate/claude-sonnet-5-5",
   ]);
   expect(user.aiSettings.modelOverrideEnabled).toStrictEqual([
     "my-model",
-    "test-tool-model",
+    "concentrate/test-tool-model",
     "concentrate/claude-sonnet-5-5",
   ]);
   expect(rowsOf(f).get(CURSOR_KEY_ROW)).toBe("sk-dummy");

@@ -154,10 +154,10 @@ converts Pi to keep the key itself. If not, run `cn refresh`.
 - `sqlite3` is required (it ships with macOS).
 - Tab completions keep using Cursor's own models.
 
-**Claude models are missing in Cursor**
-Run `cn configure cursor` again. Claude models are listed as
-`concentrate/claude-…`. A plain `claude-…` name you add by hand uses Cursor's
-own Claude, not Concentrate.
+**Claude models are missing in Cursor, or a model uses your Cursor plan**
+Run `cn configure cursor` again. Models are listed as `concentrate/<model>`. A
+plain name you add by hand, such as `claude-sonnet-5-5`, can be served by
+Cursor itself instead of Concentrate.
 
 ## GitHub Copilot app
 

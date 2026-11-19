@@ -218,13 +218,9 @@ export function configureCursor(
       ...new Set(
         models
           .filter((model) => model.chat_candidate)
-          // Cursor serves claude-* names itself, so Claude goes through
-          // Concentrate's concentrate/ alias for the same model
-          .map((model) =>
-            model.id.startsWith("claude-")
-              ? `concentrate/${model.id}`
-              : model.id,
-          ),
+          // Cursor serves names that match its own models itself, so every
+          // model goes through Concentrate's concentrate/ alias instead
+          .map((model) => `concentrate/${model.id}`),
       ),
     ];
     if (!ids.length)
@@ -232,14 +228,19 @@ export function configureCursor(
         "No tool-calling models are available for Cursor; nothing was changed.",
       );
     const disabled = new Set(list(ai.modelOverrideDisabled));
-    const previousModels = new Set(list(ai.userAddedModels));
+    // The user's own entries: on Configure again, those from before cn's first
+    // Configure, so models cn wrote earlier are replaced instead of kept
+    const own = (field: Field) => {
+      const saved = old?.prior[field];
+      return list(saved ? (saved.present ? saved.value : []) : ai[field]);
+    };
     const written: Record<Field, unknown> = {
       useOpenAIKey: true,
       openAIBaseUrl: `${apiRoot}/v1`,
-      userAddedModels: [...new Set([...previousModels, ...ids])],
+      userAddedModels: [...new Set([...own("userAddedModels"), ...ids])],
       modelOverrideEnabled: [
         ...new Set([
-          ...list(ai.modelOverrideEnabled),
+          ...own("modelOverrideEnabled"),
           ...ids.filter((id) => !disabled.has(id)),
         ]),
       ],
