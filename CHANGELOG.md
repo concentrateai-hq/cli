@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- `cn login` signs you in with your browser (or a device code over SSH), lets
+  you pick your personal account, an organization, or one of its teams, and
+  saves an API key there: the key this computer already has there, or a new
+  one. `--new` always creates another key and `--name` names it. This feature
+  is gated by a feature flag for now, if your personal account or organization
+  is not allowed, a 404 will be returned.
+
 ## 0.1.5 (2026-11-16)
 
 - **Requires Node.js 22.13 or newer.** The installer, `cn update`, and `cn`

@@ -181,20 +181,28 @@ function openBrowser(url: string) {
     .unref();
 }
 
-async function chooseAccount(
-  accounts: { organization_id: string | null; name: string }[],
-  env: Environment,
-) {
+type Account = {
+  organization_id: string | null;
+  team_id: string | null;
+  name: string;
+};
+
+async function chooseAccount(accounts: Account[], env: Environment) {
   if (accounts.length === 1) return accounts[0];
   if (!interactive(env))
     throw new CnError(
       `Choosing an account needs an interactive terminal. ${TRY_KEY}`,
     );
+  const firstTeam = accounts.findIndex((a) => a.team_id !== null);
   const choice = await select(
     {
       title: "Create an API key in",
-      // Start on the first organization; Personal is the fallback, not the default
-      initial: String(accounts.findIndex((a) => a.organization_id !== null)),
+      // Start on the first team, else the first organization; Personal is the fallback
+      initial: String(
+        firstTeam >= 0
+          ? firstTeam
+          : accounts.findIndex((a) => a.organization_id !== null),
+      ),
       items: accounts.map((account, index) => ({
         value: String(index),
         label: account.name,
@@ -253,6 +261,7 @@ async function login(
         typeof account.organization_id === "string"
           ? account.organization_id
           : null,
+      team_id: typeof account.team_id === "string" ? account.team_id : null,
       name: cleanText(account.name, 80),
     }));
   if (accounts.length === 0)
@@ -263,6 +272,7 @@ async function login(
     headers,
     body: {
       organization_id: account.organization_id,
+      team_id: account.team_id,
       // Without one the server names it after you and the date
       name: options.name,
       // Kept instead of minting another when it is already yours in that account
@@ -270,12 +280,6 @@ async function login(
         ? undefined
         : (readStoredKeyOrNull(env) ?? undefined),
     },
-  }).catch((error) => {
-    throw error instanceof HttpError && error.status === 403
-      ? new CnError(
-          `Your role can't create API keys in ${account.name}. Ask an owner of that organization.`,
-        )
-      : error;
   });
   if (!minted.reused) {
     writeKey(minted.key, env);
