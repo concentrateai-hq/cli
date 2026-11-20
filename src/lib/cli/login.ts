@@ -1,5 +1,4 @@
 import http from "node:http";
-import os from "node:os";
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -207,9 +206,11 @@ async function chooseAccount(
   return accounts[Number(choice.value)];
 }
 
+type LoginOptions = { device: boolean; name?: string; new?: boolean };
+
 /** cn login: sign in, pick an account, and save a new API key for it. */
 export function runLogin(
-  options: { device: boolean },
+  options: LoginOptions,
   env: Environment = process.env,
   open = openBrowser,
 ) {
@@ -220,12 +221,12 @@ export function runLogin(
 }
 
 async function login(
-  { device }: { device: boolean },
+  options: LoginOptions,
   env: Environment,
   open: (url: string) => void,
 ) {
   const token = await signIn(env, {
-    device: Boolean(device || env.SSH_CONNECTION || env.SSH_TTY),
+    device: Boolean(options.device || env.SSH_CONNECTION || env.SSH_TTY),
     open,
   });
   const headers = { Authorization: `Bearer ${token}` };
@@ -262,9 +263,12 @@ async function login(
     headers,
     body: {
       organization_id: account.organization_id,
-      name: `cn on ${os.hostname()}`.slice(0, 64),
+      // Without one the server names it after you and the date
+      name: options.name,
       // Kept instead of minting another when it is already yours in that account
-      current_key: readStoredKeyOrNull(env) ?? undefined,
+      current_key: options.new
+        ? undefined
+        : (readStoredKeyOrNull(env) ?? undefined),
     },
   }).catch((error) => {
     throw error instanceof HttpError && error.status === 403

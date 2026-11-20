@@ -247,3 +247,33 @@ test("cn login sends no current key when none is saved", async () => {
 
   expect(JSON.parse(calls[4].body)).not.toHaveProperty("current_key");
 });
+
+test("cn login --new creates another key instead of keeping the saved one", async () => {
+  const calls = stubLogin(
+    json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+    json({ key: "sk-cn-v1-minted", reused: false }, 201),
+  );
+  const home = loginEnv();
+  writeKey("sk-cn-v1-saved", home);
+
+  await runLogin({ device: true, new: true }, home, silent);
+
+  expect(JSON.parse(calls[4].body)).not.toHaveProperty("current_key");
+  expect(readStoredKey(home)).toBe("sk-cn-v1-minted");
+});
+
+test("cn login --name names the key; without it the server names it", async () => {
+  const named = stubLogin(
+    json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+    json({ key: "sk-cn-v1-minted", reused: false }, 201),
+  );
+  await runLogin({ device: true, name: "laptop" }, loginEnv(), silent);
+  expect(JSON.parse(named[4].body)).toMatchObject({ name: "laptop" });
+
+  const unnamed = stubLogin(
+    json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+    json({ key: "sk-cn-v1-minted", reused: false }, 201),
+  );
+  await runLogin({ device: true }, loginEnv(), silent);
+  expect(JSON.parse(unnamed[4].body)).not.toHaveProperty("name");
+});
