@@ -5,9 +5,11 @@ import { test, expect, vi } from "vitest";
 import { runLogin, signIn } from "../../src/lib/cli/login.js";
 import { runKey } from "../../src/lib/cli/commands.js";
 import { readStoredKey, writeKey } from "../../src/lib/config/settings.js";
+import { interactive, select } from "../../src/lib/ui/widgets.js";
 import { json, tempDir } from "../helpers.js";
 
 vi.mock("../../src/lib/cli/commands.js", { spy: true });
+vi.mock("../../src/lib/ui/widgets.js", { spy: true });
 
 const env = { CN_APP_URL: "https://app.test" };
 const CONFIG = {
@@ -157,17 +159,29 @@ test("cn login falls back to pasting a key where it isn't available", async () =
   expect(runKey).toHaveBeenCalledTimes(1);
 });
 
-test("cn login explains a role that can't create keys", async () => {
-  stubLogin(
-    json({ accounts: [{ organization_id: "o1", name: "Acme" }] }),
-    json({ error: "Forbidden" }, 403),
+test("cn login starts the picker on the first team and mints the key there", async () => {
+  const calls = stubLogin(
+    json({
+      accounts: [
+        { organization_id: null, team_id: null, name: "Personal" },
+        { organization_id: "o1", team_id: null, name: "Acme" },
+        { organization_id: "o1", team_id: "t1", name: "Acme / Platform" },
+      ],
+    }),
+    json({ key: "sk-cn-v1-minted", reused: false }, 201),
   );
-  const home = loginEnv();
+  vi.mocked(interactive).mockReturnValueOnce(true);
+  vi.mocked(select).mockImplementationOnce(async ({ initial }) => ({
+    value: initial,
+  }));
 
-  await expect(runLogin({ device: true }, home, silent)).rejects.toThrow(
-    "can't create API keys in Acme",
-  );
-  expect(readStoredKey(home)).toBeNull();
+  await runLogin({ device: true }, loginEnv(), silent);
+
+  expect(vi.mocked(select).mock.calls[0][0].initial).toBe("2");
+  expect(JSON.parse(calls[4].body)).toMatchObject({
+    organization_id: "o1",
+    team_id: "t1",
+  });
 });
 
 test("cn login uses a device code over SSH", async () => {
@@ -246,4 +260,34 @@ test("cn login sends no current key when none is saved", async () => {
   await runLogin({ device: true }, loginEnv(), silent);
 
   expect(JSON.parse(calls[4].body)).not.toHaveProperty("current_key");
+});
+
+test("cn login --new creates another key instead of keeping the saved one", async () => {
+  const calls = stubLogin(
+    json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+    json({ key: "sk-cn-v1-minted", reused: false }, 201),
+  );
+  const home = loginEnv();
+  writeKey("sk-cn-v1-saved", home);
+
+  await runLogin({ device: true, new: true }, home, silent);
+
+  expect(JSON.parse(calls[4].body)).not.toHaveProperty("current_key");
+  expect(readStoredKey(home)).toBe("sk-cn-v1-minted");
+});
+
+test("cn login --name names the key; without it the server names it", async () => {
+  const named = stubLogin(
+    json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+    json({ key: "sk-cn-v1-minted", reused: false }, 201),
+  );
+  await runLogin({ device: true, name: "laptop" }, loginEnv(), silent);
+  expect(JSON.parse(named[4].body)).toMatchObject({ name: "laptop" });
+
+  const unnamed = stubLogin(
+    json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+    json({ key: "sk-cn-v1-minted", reused: false }, 201),
+  );
+  await runLogin({ device: true }, loginEnv(), silent);
+  expect(JSON.parse(unnamed[4].body)).not.toHaveProperty("name");
 });

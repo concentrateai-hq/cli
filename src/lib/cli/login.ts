@@ -1,5 +1,4 @@
 import http from "node:http";
-import os from "node:os";
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -182,20 +181,28 @@ function openBrowser(url: string) {
     .unref();
 }
 
-async function chooseAccount(
-  accounts: { organization_id: string | null; name: string }[],
-  env: Environment,
-) {
+type Account = {
+  organization_id: string | null;
+  team_id: string | null;
+  name: string;
+};
+
+async function chooseAccount(accounts: Account[], env: Environment) {
   if (accounts.length === 1) return accounts[0];
   if (!interactive(env))
     throw new CnError(
       `Choosing an account needs an interactive terminal. ${TRY_KEY}`,
     );
+  const firstTeam = accounts.findIndex((a) => a.team_id !== null);
   const choice = await select(
     {
       title: "Create an API key in",
-      // Start on the first organization; Personal is the fallback, not the default
-      initial: String(accounts.findIndex((a) => a.organization_id !== null)),
+      // Start on the first team, else the first organization; Personal is the fallback
+      initial: String(
+        firstTeam >= 0
+          ? firstTeam
+          : accounts.findIndex((a) => a.organization_id !== null),
+      ),
       items: accounts.map((account, index) => ({
         value: String(index),
         label: account.name,
@@ -207,9 +214,11 @@ async function chooseAccount(
   return accounts[Number(choice.value)];
 }
 
+type LoginOptions = { device: boolean; name?: string; new?: boolean };
+
 /** cn login: sign in, pick an account, and save a new API key for it. */
 export function runLogin(
-  options: { device: boolean },
+  options: LoginOptions,
   env: Environment = process.env,
   open = openBrowser,
 ) {
@@ -220,12 +229,12 @@ export function runLogin(
 }
 
 async function login(
-  { device }: { device: boolean },
+  options: LoginOptions,
   env: Environment,
   open: (url: string) => void,
 ) {
   const token = await signIn(env, {
-    device: Boolean(device || env.SSH_CONNECTION || env.SSH_TTY),
+    device: Boolean(options.device || env.SSH_CONNECTION || env.SSH_TTY),
     open,
   });
   const headers = { Authorization: `Bearer ${token}` };
@@ -252,6 +261,7 @@ async function login(
         typeof account.organization_id === "string"
           ? account.organization_id
           : null,
+      team_id: typeof account.team_id === "string" ? account.team_id : null,
       name: cleanText(account.name, 80),
     }));
   if (accounts.length === 0)
@@ -262,16 +272,14 @@ async function login(
     headers,
     body: {
       organization_id: account.organization_id,
-      name: `cn on ${os.hostname()}`.slice(0, 64),
+      team_id: account.team_id,
+      // Without one the server names it after you and the date
+      name: options.name,
       // Kept instead of minting another when it is already yours in that account
-      current_key: readStoredKeyOrNull(env) ?? undefined,
+      current_key: options.new
+        ? undefined
+        : (readStoredKeyOrNull(env) ?? undefined),
     },
-  }).catch((error) => {
-    throw error instanceof HttpError && error.status === 403
-      ? new CnError(
-          `Your role can't create API keys in ${account.name}. Ask an owner of that organization.`,
-        )
-      : error;
   });
   if (!minted.reused) {
     writeKey(minted.key, env);
