@@ -1,6 +1,7 @@
 import {
   codexConfigArguments,
   codexHeaderConfig,
+  configDocument,
   codexProviderHasCredential,
 } from "./app-headers.js";
 import { record } from "../validation.js";
@@ -104,7 +105,7 @@ const adapter: Harness = {
     "Install Codex CLI (npm install -g @openai/codex), then run cn codex again.",
   modelFlags: ["-m", "--model"],
 
-  async prepare({ executable, model, key, available, forwarded, env }) {
+  async prepare({ executable, model, key, available, forwarded, env, mcp }) {
     const startedAt = Date.now();
     const scope = (): RunScope => ({
       env,
@@ -124,6 +125,26 @@ const adapter: Harness = {
       'model_providers.concentrate.wire_api="responses"',
       "model_providers.concentrate.requires_openai_auth=false",
     ];
+    // A url override on a server the user runs locally stops Codex from starting.
+    const own = new Set([
+      ...Object.keys(
+        record(
+          configDocument(
+            path.join(
+              env.CODEX_HOME || path.join(env.HOME || os.homedir(), ".codex"),
+              "config.toml",
+            ),
+            "toml",
+          ).mcp_servers,
+        ),
+      ),
+      ...userConfig.overrides.map(
+        (value) => /^mcp_servers\.([\w-]+)\s*[.=]/.exec(value)?.[1],
+      ),
+    ]);
+    for (const [name, { url }] of Object.entries(mcp))
+      if (!own.has(name))
+        overrides.push(`mcp_servers.${name}.url=${JSON.stringify(url)}`);
     const headers = codexHeaderConfig("concentrate", env, forwarded);
     const headerOverrides = (["http_headers", "env_http_headers"] as const).map(
       (field) => {
