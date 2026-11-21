@@ -6,6 +6,7 @@ import { test, expect, vi } from "vitest";
 import { runLogin, signIn } from "../../src/lib/cli/login.js";
 import { runKey } from "../../src/lib/cli/commands.js";
 import { readStoredKey, writeKey } from "../../src/lib/config/settings.js";
+import { readSession } from "../../src/lib/config/session.js";
 import { interactive, select } from "../../src/lib/ui/widgets.js";
 import { json, tempDir } from "../helpers.js";
 
@@ -21,7 +22,9 @@ const CONFIG = {
 };
 
 // Routes the stubbed fetch by URL; token responses are served in order.
-function stubAuth({ token = [json({ access_token: "at" })], device } = {}) {
+const TOKENS = { access_token: "at", refresh_token: "rt", expires_in: 3600 };
+
+function stubAuth({ token = [json(TOKENS)], device } = {}) {
   const calls = [];
   vi.stubGlobal("fetch", async (url, init) => {
     calls.push({ url: String(url), body: init?.body?.toString() });
@@ -51,7 +54,10 @@ test("PKCE exchanges the code with the verifier it challenged", async () => {
     return { code: "c", state: params.get("state") };
   });
 
-  await expect(signIn(env, { device: false, open })).resolves.toBe("at");
+  await expect(signIn(env, { device: false, open })).resolves.toMatchObject({
+    token: "at",
+    session: { access_token: "at", refresh_token: "rt" },
+  });
 
   const sent = new URLSearchParams(calls[1].body);
   expect(calls[1].url).toBe(CONFIG.token_endpoint);
@@ -95,7 +101,9 @@ test("device code polls past authorization_pending", async () => {
     ],
   });
 
-  await expect(signIn(env, { device: true, open: silent })).resolves.toBe("at");
+  await expect(
+    signIn(env, { device: true, open: silent }),
+  ).resolves.toStrictEqual({ token: "at", session: null });
   expect(calls).toHaveLength(4);
 });
 
@@ -132,7 +140,7 @@ const DEVICE = {
 
 // Signs in by device code, then answers the account and key calls in order.
 const stubLogin = (...app) =>
-  stubAuth({ device: DEVICE, token: [json({ access_token: "at" }), ...app] });
+  stubAuth({ device: DEVICE, token: [json(TOKENS), ...app] });
 const loginEnv = () => ({ ...env, HOME: tempDir(), CN_CONFIG_HOME: tempDir() });
 
 test("cn login saves the key minted for a single account", async () => {
@@ -145,6 +153,7 @@ test("cn login saves the key minted for a single account", async () => {
   await expect(runLogin({ device: true }, home, silent)).resolves.toBe(0);
 
   expect(readStoredKey(home)).toBe("sk-cn-v1-minted");
+  expect(readSession(home)?.refresh_token).toBe("rt");
   expect(calls[3]).toMatchObject({
     url: "https://app.test/api/cli/accounts",
   });

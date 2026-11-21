@@ -4,6 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { HttpError, requestJson } from "../catalog.js";
+import { type Session, toSession, writeSession } from "../config/session.js";
 import { readStoredKeyOrNull, writeKey } from "../config/settings.js";
 import { CnError } from "../errors.js";
 import { refreshConfiguredKey } from "../harnesses/tool-config.js";
@@ -46,13 +47,16 @@ function endpoint(value: unknown, what: string) {
   return url.href;
 }
 
-function accessToken(body: Record<string, unknown>) {
+function signedIn(body: Record<string, unknown>) {
   if (body.error)
     throw new CnError(`Sign-in failed (${cleanText(body.error)}). ${TRY_KEY}`);
-  return text(body.access_token, "access token");
+  return {
+    token: text(body.access_token, "access token"),
+    session: toSession(body),
+  };
 }
 
-/** Signs in to Concentrate AI in the browser or with a device code; returns the access token. */
+/** Signs in to Concentrate AI in the browser or with a device code; returns the access token and session. */
 export async function signIn(
   env: Environment,
   {
@@ -60,7 +64,7 @@ export async function signIn(
     open,
     timeoutMs = 300_000,
   }: { device: boolean; open: (url: string) => void; timeoutMs?: number },
-): Promise<string> {
+): Promise<{ token: string; session: Session | null }> {
   const config = await requestJson(`${appRoot(env)}/api/cli/config`);
   const clientId = text(config.client_id, "client id");
   const tokenUrl = endpoint(config.token_endpoint, "address");
@@ -124,7 +128,7 @@ async function browserCode(
       `Opening your browser to sign in. If it doesn't open, visit:\n  ${url}`,
     );
     open(url);
-    return accessToken(
+    return signedIn(
       await postForm(tokenUrl, {
         grant_type: "authorization_code",
         code: await code,
@@ -165,7 +169,7 @@ async function deviceCode(
       client_id: clientId,
     });
     if (body.error === "slow_down") interval += 5;
-    else if (body.error !== "authorization_pending") return accessToken(body);
+    else if (body.error !== "authorization_pending") return signedIn(body);
   }
   throw new CnError(`The sign-in code expired. ${TRY_KEY}`);
 }
@@ -240,10 +244,11 @@ async function login(
   env: Environment,
   open: (url: string) => void,
 ) {
-  const token = await signIn(env, {
+  const { token, session } = await signIn(env, {
     device: Boolean(options.device || env.SSH_CONNECTION || env.SSH_TTY),
     open,
   });
+  writeSession(session, env);
   const headers = { Authorization: `Bearer ${token}` };
   const listed = await requestJson(`${appRoot(env)}/api/cli/accounts`, {
     headers,
