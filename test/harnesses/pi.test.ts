@@ -120,7 +120,7 @@ test("pi gets org MCP servers in a merged mcp.json; the user's entries and other
   expect(out.mcp).toStrictEqual({
     extra: 1,
     mcpServers: {
-      docs: { type: "http", url: "https://docs.example/mcp" },
+      docs: { url: "https://docs.example/mcp" },
       mine: { command: "x" },
     },
   });

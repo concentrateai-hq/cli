@@ -103,7 +103,9 @@ function preparePiDir(
           Object.keys(record(configDocument(file).mcpServers)),
         ),
       );
-      const pushed = Object.entries(mcp).filter(([name]) => !taken.has(name));
+      const pushed = Object.entries(mcp)
+        .filter(([name]) => !taken.has(name))
+        .map(([name, { url }]): [string, { url: string }] => [name, { url }]);
       if (pushed.length) {
         writePrivate(path.join(directory, "mcp.json"), {
           ...own,
