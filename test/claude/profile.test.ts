@@ -130,8 +130,8 @@ test("cn claude hides Claude's classifier billing notice without touching the us
   expect(fs.readFileSync(user, "utf8")).toBe(before);
 });
 
-const launch = (env) => {
-  const profile = prepareClaudeProfile(env);
+const launch = (env, mcp = {}) => {
+  const profile = prepareClaudeProfile(env, mcp);
   profile.cleanup();
   return profile;
 };
@@ -364,4 +364,39 @@ test("the user's own welcome flags and theme win over the profile's", () => {
   expect(JSON.parse(readProfile(launch(env), "settings.json")).theme).toBe(
     "light",
   );
+});
+
+const ORG = { docs: { type: "http", url: "https://docs.example/mcp" } };
+
+test("org MCP servers are added to the profile; the user's own entry wins a name clash", () => {
+  const { source, env } = sourceEnv("cn-profile-org-");
+  fs.writeFileSync(
+    path.join(source, ".claude.json"),
+    JSON.stringify({ mcpServers: { shared: { command: "user" } } }),
+  );
+  const profile = launch(env, {
+    ...ORG,
+    shared: { type: "http", url: "https://org.example/mcp" },
+  });
+  expect(
+    JSON.parse(readProfile(profile, ".claude.json")).mcpServers,
+  ).toStrictEqual({
+    shared: { command: "user" },
+    docs: { type: "http", url: "https://docs.example/mcp" },
+  });
+});
+
+test("a server the org removes is gone on the next launch; servers added under cn stay", () => {
+  const { source, env } = sourceEnv("cn-profile-org-removed-");
+  fs.writeFileSync(path.join(source, ".claude.json"), "{}");
+  const first = launch(env, ORG);
+  const state = JSON.parse(readProfile(first, ".claude.json"));
+  state.mcpServers.added = { command: "cn" };
+  fs.writeFileSync(
+    path.join(first.directory, ".claude.json"),
+    JSON.stringify(state),
+  );
+  launch(env, ORG);
+  const after = JSON.parse(readProfile(launch(env), ".claude.json"));
+  expect(after.mcpServers).toStrictEqual({ added: { command: "cn" } });
 });

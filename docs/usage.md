@@ -53,6 +53,10 @@ the session metadata so Claude's native cache diagnostics can skip them. The
 conversation remains shared, and a private backup is saved in
 `claude-session-backups/` under cn's configuration directory. Sessions open in
 another Claude process are not changed.
+When you're signed in with `cn login`, each launch adds the remote MCP servers
+your organization manages to the tool. A server you define yourself with the
+same name wins. If the list can't be fetched, cn uses the last one it saved
+and says so; if your sign-in expired, run `cn login` again.
 Codex's picker includes sessions started with other providers. Pi uses its normal
 session directory and its own session picker; explicit `--session-dir` overrides
 are respected. Older sessions created under cn's `pi-sessions/` directory remain

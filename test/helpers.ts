@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -114,6 +115,29 @@ export function writeCatalog(config, models) {
   fs.writeFileSync(
     path.join(config, "catalog.json"),
     JSON.stringify({ version: 6, fetchedAt: Date.now() / 1000, models }),
+    { mode: 0o600 },
+  );
+}
+
+// A signed-in config dir with a saved copy of the org's MCP servers for `key`.
+export function writeOrgServers(config, key, mcp) {
+  fs.writeFileSync(
+    path.join(config, "org-servers.json"),
+    JSON.stringify({
+      key: createHash("sha256").update(key).digest("hex"),
+      mcp,
+    }),
+    { mode: 0o600 },
+  );
+  fs.writeFileSync(
+    path.join(config, "credentials.json"),
+    JSON.stringify({
+      session: {
+        access_token: "at",
+        refresh_token: "rt",
+        expires_at: Date.now() + 3_600_000,
+      },
+    }),
     { mode: 0o600 },
   );
 }

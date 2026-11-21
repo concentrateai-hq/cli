@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { configDir, writeJson } from "../config/settings.js";
-import type { Environment } from "../types.js";
+import type { Environment, McpServers } from "../types.js";
 import { errorCode, isRecord, record } from "../validation.js";
 
 const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
@@ -44,8 +44,8 @@ const WELCOME = ["hasCompletedOnboarding", "lastOnboardingVersion"];
 const serverNames = (value: unknown) =>
   Object.keys(record(record(value).mcpServers));
 
-// Servers added under cn are the ones the user's file lacked at the last
-// launch, so a server the user removes stays removed. The user's file wins.
+// Servers added under cn are the ones neither the user's file nor the org had
+// at the last launch, so a removed server stays removed. The user's file wins.
 const carryServers = (
   to: Record<string, unknown>,
   from: unknown,
@@ -64,6 +64,7 @@ function carryApprovals(
   state: Record<string, unknown>,
   file: string,
   userServersFile: string,
+  org: McpServers,
 ) {
   const previous = readQuietly(file);
   const userHad = readQuietly(userServersFile);
@@ -75,13 +76,19 @@ function carryApprovals(
         serverNames(value),
       ]),
     ),
+    org: Object.keys(org),
   });
   for (const key of WELCOME)
     if (!(key in state) && key in record(previous))
       state[key] = record(previous)[key];
   // No record yet (first launch on this version): carry no servers, as before.
   if (isRecord(userHad))
-    carryServers(state, previous, list(userHad.mcpServers));
+    carryServers(state, previous, [
+      ...list(userHad.mcpServers),
+      ...list(userHad.org),
+    ]);
+  if (Object.keys(org).length)
+    state.mcpServers = { ...org, ...record(state.mcpServers) };
   const projects = record(state.projects);
   for (const [dir, value] of Object.entries(
     record(record(previous).projects),
@@ -123,7 +130,7 @@ export const claudeProfileDir = (env: Environment) =>
 
 // Claude writes /model selections to its user settings even when launched with
 // --settings, so cn keeps its own permanent profile; sign-ins made there last.
-export function prepareClaudeProfile(env: Environment) {
+export function prepareClaudeProfile(env: Environment, mcp: McpServers = {}) {
   const home = env.HOME || os.homedir();
   const source = env.CLAUDE_CONFIG_DIR || path.join(home, ".claude");
   const directory = claudeProfileDir(env);
@@ -194,6 +201,7 @@ export function prepareClaudeProfile(env: Environment) {
         state,
         profileState,
         path.join(configDir(env), "claude-user-mcp-servers.json"),
+        mcp,
       );
       // Claude sends a device ID with every request, and Concentrate's prompt
       // cache follows it. Without the user's own, Claude would invent a new one

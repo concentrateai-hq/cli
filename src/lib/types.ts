@@ -46,6 +46,7 @@ export interface PrepareOptions {
   available: Model[];
   forwarded: string[];
   env: Environment;
+  mcp: McpServers;
 }
 export interface PreparedHarness {
   args: string[];
