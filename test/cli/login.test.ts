@@ -412,8 +412,8 @@ test("two refreshes at once send one token request", async () => {
   await expect(
     Promise.all([sessionToken(home), sessionToken(home)]),
   ).resolves.toStrictEqual(["a2", "a2"]);
-  expect(calls).toHaveLength(2);
-  expect(calls[1].url).toBe(CONFIG.token_endpoint);
+  expect(calls).toHaveLength(3);
+  expect(calls[2].url).toBe(CONFIG.token_endpoint);
 });
 
 test("a rejected refresh drops the session and keeps the key", async () => {
@@ -477,4 +477,55 @@ test("cn login --fresh signs in even with a live session", async () => {
   await runLogin({ device: true, fresh: true }, home, silent);
 
   expect(readSession(home)?.access_token).toBe("at");
+});
+
+// The token endpoint answers after another process has taken over the lock.
+function stubTakeover(lock) {
+  vi.stubGlobal("fetch", async (url) => {
+    if (String(url) === "https://app.test/api/cli/config") return json(CONFIG);
+    fs.writeFileSync(lock, "another process");
+    return json(REFRESHED);
+  });
+}
+
+test("a finished refresh leaves a lock another process took over", async () => {
+  const home = withSession(0);
+  const lock = path.join(home.CN_CONFIG_HOME, "session.lock");
+  stubTakeover(lock);
+
+  await expect(sessionToken(home)).resolves.toBe("a2");
+  expect(fs.readFileSync(lock, "utf8")).toBe("another process");
+});
+
+test("cn login signs in again when the saved session can't be refreshed", async () => {
+  stubAuth({
+    device: DEVICE,
+    token: [
+      new Response("Bad gateway", { status: 502 }),
+      json(TOKENS),
+      json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+      json({ key: "sk-cn-v1-minted" }, 201),
+    ],
+  });
+  const home = withSession(0);
+
+  await expect(runLogin({ device: true }, home, silent)).resolves.toBe(0);
+  expect(readSession(home)?.access_token).toBe("at");
+});
+
+test("cn login signs in again when the server rejects the saved token", async () => {
+  stubAuth({
+    device: DEVICE,
+    token: [
+      json({ error: "Unauthorized" }, 401),
+      json(TOKENS),
+      json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+      json({ key: "sk-cn-v1-minted" }, 201),
+    ],
+  });
+  const home = withSession(3_600_000);
+
+  await expect(runLogin({ device: true }, home, silent)).resolves.toBe(0);
+  expect(readSession(home)?.access_token).toBe("at");
+  expect(readStoredKey(home)).toBe("sk-cn-v1-minted");
 });

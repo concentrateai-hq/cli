@@ -186,11 +186,12 @@ const live = (session: Session) => session.expires_at - Date.now() > 60_000;
 export async function sessionToken(env: Environment): Promise<string | null> {
   const saved = readSession(env);
   if (!saved || live(saved)) return saved?.access_token ?? null;
+  // Fetched before locking, so the lock is held for a single request
+  const config = await requestJson(`${appRoot(env)}/api/cli/config`);
   return withSessionLock(env, async () => {
     const current = readSession(env);
     // Another cn process may have refreshed while this one waited
     if (!current || live(current)) return current?.access_token ?? null;
-    const config = await requestJson(`${appRoot(env)}/api/cli/config`);
     const body = await postForm(endpoint(config.token_endpoint, "address"), {
       grant_type: "refresh_token",
       refresh_token: current.refresh_token,
@@ -282,22 +283,38 @@ async function login(
   env: Environment,
   open: (url: string) => void,
 ) {
-  const token =
-    (!options.fresh && (await sessionToken(env))) ||
-    (await signIn(env, {
+  const signInAgain = () =>
+    signIn(env, {
       device: Boolean(options.device || env.SSH_CONNECTION || env.SSH_TTY),
       open,
     }).then(({ token, session }) => {
       writeSession(session, env);
       return token;
-    }));
-  const headers = { Authorization: `Bearer ${token}` };
-  const listed = await requestJson(`${appRoot(env)}/api/cli/accounts`, {
-    headers,
-  }).catch((error) => {
-    if (error instanceof HttpError && error.status === 404) return null;
-    throw error;
+    });
+  // A saved sign-in that can't be refreshed falls back to signing in
+  const reused = options.fresh
+    ? null
+    : await sessionToken(env).catch(() => null);
+  if (reused)
+    console.log(
+      ledger("info", "login", "using your saved sign-in (--fresh to switch)"),
+    );
+  let token = reused ?? (await signInAgain());
+  const listAccounts = () =>
+    requestJson(`${appRoot(env)}/api/cli/accounts`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch((error) => {
+      if (error instanceof HttpError && error.status === 404) return null;
+      throw error;
+    });
+  const listed = await listAccounts().catch(async (error) => {
+    if (!(reused && error instanceof HttpError && error.status === 401))
+      throw error;
+    writeSession(null, env); // the server no longer accepts the saved sign-in
+    token = await signInAgain();
+    return listAccounts();
   });
+  const headers = { Authorization: `Bearer ${token}` };
   if (!listed) {
     console.log(
       ledger(
