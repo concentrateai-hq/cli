@@ -1,6 +1,6 @@
-import { appHeaders } from "./app-headers.js";
+import { appHeaders, configDocument } from "./app-headers.js";
 import { record } from "../validation.js";
-import type { Harness, Environment, Model } from "../types.js";
+import type { Harness, Environment, McpServers, Model } from "../types.js";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -62,6 +62,7 @@ function preparePiDir(
   model: string,
   available: Model[],
   env: Environment,
+  mcp: McpServers,
 ) {
   const source =
     env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
@@ -81,6 +82,42 @@ function preparePiDir(
       ).providers,
     },
   });
+  // Org servers go in a merged copy of mcp.json, skipping names the user defines
+  // in any file Pi or its MCP adapter reads. A file that won't parse stays linked.
+  let copied = false;
+  if (Object.keys(mcp).length) {
+    const home = env.HOME || os.homedir();
+    const user = path.join(source, "mcp.json");
+    try {
+      const own = configDocument(user);
+      const taken = new Set(
+        [
+          user,
+          path.join(source, "mcp-adapter.json"),
+          path.join(home, ".config", "mcp", "mcp.json"),
+          path.join(home, ".agents", "mcp.json"),
+          path.join(home, ".agents", "mcp", "mcp.json"),
+          path.join(process.cwd(), ".mcp.json"),
+          path.join(process.cwd(), ".pi", "mcp-adapter.json"),
+        ].flatMap((file) =>
+          Object.keys(record(configDocument(file).mcpServers)),
+        ),
+      );
+      const pushed = Object.entries(mcp).filter(([name]) => !taken.has(name));
+      if (pushed.length) {
+        writePrivate(path.join(directory, "mcp.json"), {
+          ...own,
+          mcpServers: {
+            ...Object.fromEntries(pushed),
+            ...record(own.mcpServers),
+          },
+        });
+        copied = true;
+      }
+    } catch {
+      // Pi reports the damaged file itself.
+    }
+  }
   let names: string[] = [];
   try {
     names = fs.readdirSync(source);
@@ -88,7 +125,7 @@ function preparePiDir(
     // No Pi directory yet; there is nothing to carry over.
   }
   for (const name of names) {
-    if (OWNED.has(name)) continue;
+    if (OWNED.has(name) || (copied && name === "mcp.json")) continue;
     try {
       fs.symlinkSync(path.join(source, name), path.join(directory, name));
     } catch {
@@ -115,13 +152,13 @@ const adapter: Harness = {
   modelFlags: ["--model", "--provider"],
   version: piVersion,
 
-  async prepare({ executable, model, key, available, forwarded, env }) {
+  async prepare({ executable, model, key, available, forwarded, env, mcp }) {
     requireSupportedPi(executable);
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cn-pi-"));
     const cleanup = () =>
       fs.rmSync(directory, { recursive: true, force: true });
     try {
-      preparePiDir(directory, model, available, env);
+      preparePiDir(directory, model, available, env, mcp);
       return {
         args: ["--provider", "concentrate", "--model", model, ...forwarded],
         env: { CONCENTRATE_API_KEY: key, PI_CODING_AGENT_DIR: directory },
