@@ -16,8 +16,8 @@
   kept between launches. Servers in your own Claude config still win a name
   clash, and one you remove there is removed under `cn claude` too.
 - When you're signed in with `cn login`, MCP servers your organization manages
-  are added to Claude Code, Codex and Pi at launch. Your own servers win a name
-  clash. If they can't be fetched, cn uses the last ones it saved.
+  are added to Claude Code, Codex, OpenCode and Pi at launch. Your own servers
+  win a name clash. If they can't be fetched, cn uses the last ones it saved.
 
 ## 0.1.5 (2026-11-16)
 

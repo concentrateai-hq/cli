@@ -135,11 +135,8 @@ export function codexHeaderConfig(
   };
 }
 
-export function openCodeHeaders(
-  env: Environment,
-  modern: boolean,
-  session = true,
-) {
+// The user's OpenCode config files, lowest precedence first, as cn's run sees them.
+export function openCodeDocuments(env: Environment, session = true) {
   const root = path.join(
     env.XDG_CONFIG_HOME || path.join(env.HOME || os.homedir(), ".config"),
     "opencode",
@@ -158,9 +155,17 @@ export function openCodeHeaders(
   const documents = files.map((file) => configDocument(file));
   if (session && env.OPENCODE_CONFIG_CONTENT)
     documents.push(parseConfig(env.OPENCODE_CONFIG_CONTENT, "json"));
+  return documents;
+}
+
+export function openCodeHeaders(
+  env: Environment,
+  modern: boolean,
+  session = true,
+) {
   return appHeaders(
     "opencode",
-    ...documents.map((doc) => {
+    ...openCodeDocuments(env, session).map((doc) => {
       const provider = record(
         record(doc[modern ? "providers" : "provider"]).concentrate,
       );
