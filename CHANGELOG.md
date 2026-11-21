@@ -9,6 +9,9 @@
   secret in place, and `--name` names a new key. `cn login` is rolling out
   gradually: where it isn't available yet, cn says so and asks you to paste a
   key instead.
+- After you sign in, `cn login` remembers you and goes straight to choosing an
+  account. `cn login --fresh` signs in again, and `cn logout` signs you out on
+  this computer.
 - MCP servers added inside `cn claude` (for example with `claude mcp add`) are
   kept between launches. Servers in your own Claude config still win a name
   clash, and one you remove there is removed under `cn claude` too.

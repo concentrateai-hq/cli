@@ -160,9 +160,9 @@ for differences between permanent configuration and a session launched through `
 | `cn reset <tool>`     | Restore that tool’s previous settings                           |
 | `cn setup`            | Set up your API key                                             |
 | `cn config`           | Show key status, default models, and routing status             |
-| `cn login`            | Sign in and save an API key (`--device`, `--new`, `--rotate`, `--name`) |
+| `cn login`            | Sign in and save an API key (`--device`, `--new`, `--rotate`, `--name`, `--fresh`) |
 | `cn key`              | Replace the saved API key                                       |
-| `cn logout`           | Remove the saved API key                                        |
+| `cn logout`           | Sign out and remove the saved API key                           |
 | `cn doctor`           | Check tool installations and key status                         |
 | `cn doctor <tool>`    | Test a tool's API route with a live request                     |
 | `cn update`           | Update cn, then refresh configured tools (`--check` only looks) |
