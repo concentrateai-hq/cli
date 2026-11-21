@@ -135,6 +135,8 @@ async function browserCode(
     );
   } finally {
     clearTimeout(timer);
+    // Browsers keep spare connections open, which would keep cn from exiting
+    server.closeAllConnections();
     server.close();
   }
 }

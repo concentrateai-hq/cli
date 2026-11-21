@@ -1,4 +1,5 @@
 import http from "node:http";
+import net from "node:net";
 import { createHash } from "node:crypto";
 import { test, expect, vi } from "vitest";
 
@@ -290,4 +291,23 @@ test("cn login --name names the key; without it the server names it", async () =
   );
   await runLogin({ device: true }, loginEnv(), silent);
   expect(JSON.parse(unnamed[4].body)).not.toHaveProperty("name");
+});
+
+test("PKCE closes a connection the browser opened but never used", async () => {
+  stubAuth();
+  let closed!: Promise<void>;
+  const open = (url) => {
+    const params = new URL(url).searchParams;
+    const callback = new URL(params.get("redirect_uri"));
+    // Browsers open a spare connection ahead of time and may never send on it
+    const spare = net.connect(Number(callback.port), "127.0.0.1");
+    closed = new Promise((resolve) => spare.on("close", () => resolve()));
+    callback.searchParams.set("code", "c");
+    callback.searchParams.set("state", params.get("state"));
+    spare.on("connect", () => http.get(callback, (res) => res.resume()));
+  };
+
+  await signIn(env, { device: false, open });
+
+  await closed;
 });
