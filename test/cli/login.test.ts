@@ -454,7 +454,7 @@ test("cn login with a live session skips the browser", async () => {
   const open = vi.fn();
   const home = withSession(3_600_000);
 
-  await runLogin({ device: false }, home, open);
+  await expect(runLogin({ device: false }, home, open)).resolves.toBe(0);
 
   expect(open).not.toHaveBeenCalled();
   expect(calls[0]).toMatchObject({
@@ -528,4 +528,20 @@ test("cn login signs in again when the server rejects the saved token", async ()
   await expect(runLogin({ device: true }, home, silent)).resolves.toBe(0);
   expect(readSession(home)?.access_token).toBe("at");
   expect(readStoredKey(home)).toBe("sk-cn-v1-minted");
+});
+
+test("cn login signs in again when the saved session has ended", async () => {
+  stubAuth({
+    device: DEVICE,
+    token: [
+      json({ error: "invalid_grant" }, 400),
+      json(TOKENS),
+      json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+      json({ key: "sk-cn-v1-minted" }, 201),
+    ],
+  });
+  const home = withSession(0);
+
+  await expect(runLogin({ device: true }, home, silent)).resolves.toBe(0);
+  expect(readSession(home)?.refresh_token).toBe("rt");
 });

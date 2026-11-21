@@ -52,3 +52,13 @@ test("toSession sets the expiry from expires_in", () => {
 test("a sign-in without a refresh token has no session", () => {
   expect(toSession({ access_token: "a", expires_in: 60 }, 1000)).toBe(null);
 });
+
+test("a damaged credentials file reads as no session", () => {
+  const env = sandbox();
+  writeSession(SESSION, env);
+  fs.writeFileSync(path.join(env.CN_CONFIG_HOME, "credentials.json"), "{", {
+    mode: 0o600,
+  });
+
+  expect(readSession(env)).toBe(null);
+});

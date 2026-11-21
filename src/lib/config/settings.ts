@@ -286,6 +286,7 @@ const STATE_FILES = [
   "claude-device-id",
   "update-check.json",
   "update-prompt.json",
+  "session.lock",
 ];
 
 // What `cn reset` would remove. Pi chat history only counts when asked for.

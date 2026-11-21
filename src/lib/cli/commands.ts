@@ -464,13 +464,17 @@ export function runLogout(env: Environment = process.env) {
     }
   }
   const signedIn = readSession(env) !== null;
+  const hadKey = readStoredKeyOrNull(env) !== null;
+  const removed = !deleteStoredKey(env)
+    ? null
+    : signedIn && hadKey
+      ? "signed out, saved key removed"
+      : signedIn
+        ? "signed out"
+        : "saved key removed";
   console.log(
-    deleteStoredKey(env)
-      ? ledger(
-          "ok",
-          "logout",
-          signedIn ? "signed out, saved key removed" : "saved key removed",
-        )
+    removed
+      ? ledger("ok", "logout", removed)
       : ledger("mute", "logout", "no saved key found"),
   );
   if (env.CONCENTRATE_API_KEY) {

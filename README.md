@@ -196,7 +196,7 @@ since. Save your key first with `cn key`.
 | `cn reset <tool>`     | Switch a tool back                              |
 | `cn model [<tool>]`   | Show or change default models                   |
 | `cn models [<tool>]`  | Browse available models                         |
-| `cn login`            | Sign in and save an API key                     |
+| `cn login`            | Sign in and save an API key (`--fresh` signs in again) |
 | `cn key`              | Replace your saved API key                      |
 | `cn logout`           | Sign out and remove your saved API key          |
 | `cn baa [on\|off]`    | Show only models covered by a BAA               |

@@ -9,9 +9,9 @@
   secret in place, and `--name` names a new key. `cn login` is rolling out
   gradually: where it isn't available yet, cn says so and asks you to paste a
   key instead.
-- After you sign in, `cn login` remembers you for 30 days and goes straight to
-  choosing an account. `cn login --fresh` signs in again, and `cn logout` signs
-  you out on this computer.
+- After you sign in, `cn login` remembers you and goes straight to choosing an
+  account. `cn login --fresh` signs in again, and `cn logout` signs you out on
+  this computer.
 
 ## 0.1.5 (2026-11-16)
 

@@ -52,7 +52,7 @@ Usage:
   cn config                                   Show key status and default models
   cn login [--device] [--new|--rotate]        Sign in and save an API key (--name N, --fresh)
   cn key [--no-verify]                        Replace the saved API key
-  cn logout                                   Remove the saved API key
+  cn logout                                   Sign out and remove the saved API key
   cn baa [on|off]                             Show only models covered by a BAA
   cn reset [--yes] [--sessions]               Clear everything cn saved and start fresh
   cn model [<tool> [<model-id>]]              Show or change default models
