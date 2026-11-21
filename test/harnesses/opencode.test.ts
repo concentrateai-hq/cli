@@ -4,7 +4,7 @@ import { test, expect } from "vitest";
 
 import { withStandalone } from "../../src/lib/harnesses/opencode.js";
 import { opencodeConfig } from "../../src/lib/harnesses/pickers.js";
-import { runCn, setup } from "../helpers.js";
+import { runCn, setup, writeOrgServers } from "../helpers.js";
 
 // Stand-in OpenCode. FAKE_OC=v2 makes --help advertise --standalone, as the real v2 does.
 function rig(version) {
@@ -150,4 +150,48 @@ test("doctor shows which OpenCode version is installed", () => {
   expect(runCn(["doctor"], { env: rig("v1").env }).stdout).toMatch(
     /OpenCode\s+\S+opencode\s+1\.19\.0/,
   );
+});
+
+// Org servers plus a user opencode.json that defines two of their names.
+function orgRig(version) {
+  const r = rig(version);
+  writeOrgServers(r.env.CN_CONFIG_HOME, "sk-test", {
+    docs: { url: "https://docs.example/mcp" },
+    mine: { url: "https://org.example/mcp" },
+    nested: { url: "https://org.example/n" },
+  });
+  const global = path.join(r.env.HOME, ".config", "opencode");
+  fs.mkdirSync(global, { recursive: true });
+  fs.writeFileSync(
+    path.join(global, "opencode.json"),
+    JSON.stringify({
+      mcp: {
+        mine: { type: "local", command: ["x"] },
+        servers: { nested: { type: "local", command: ["y"] } },
+      },
+    }),
+  );
+  return r;
+}
+
+test("v2: org MCP servers are remote entries under mcp.servers; the user's own names win", () => {
+  const { env, seen } = orgRig("v2");
+  expect(runCn(["opencode"], { env }).status).toBe(0);
+  expect(JSON.parse(seen().config).mcp).toStrictEqual({
+    servers: { docs: { type: "remote", url: "https://docs.example/mcp" } },
+  });
+});
+
+test("v1: org MCP servers are enabled remote entries under mcp; the user's own names win", () => {
+  const { env, seen } = orgRig("v1");
+  expect(runCn(["opencode"], { env }).status).toBe(0);
+  expect(JSON.parse(seen().config).mcp).toStrictEqual({
+    docs: { type: "remote", url: "https://docs.example/mcp", enabled: true },
+  });
+});
+
+test("without org servers the inline config has no mcp key", () => {
+  const { env, seen } = rig("v1");
+  expect(runCn(["opencode"], { env }).status).toBe(0);
+  expect(JSON.parse(seen().config).mcp).toBe(undefined);
 });

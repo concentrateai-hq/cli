@@ -77,6 +77,7 @@ test("launch adapters add X-App and preserve existing Pi provider headers", asyn
     key: "sk-test",
     available: [],
     forwarded: ["--no-session"],
+    mcp: {},
     env,
   };
   const prepared = await codex.prepare({ ...input, forwarded: [] });
@@ -127,6 +128,7 @@ test("Codex keeps subcommand config overrides beside its connection options", as
       "Reply OK",
     ],
     env: { HOME: root },
+    mcp: {},
   });
   const subcommand = prepared.args.indexOf("exec");
   expect(prepared.args.indexOf('model_provider="concentrate"')).toBeLessThan(
@@ -152,6 +154,7 @@ test("Pi keeps the user's MCP config and other files but never their login", asy
     key: "sk-test",
     available: [],
     forwarded: [],
+    mcp: {},
     env: { HOME: root, PI_CODING_AGENT_DIR: root, CN_CONFIG_HOME: root },
   });
   try {

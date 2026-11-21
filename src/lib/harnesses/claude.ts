@@ -56,7 +56,7 @@ const adapter: Harness = {
     "Install Claude Code (https://claude.com/claude-code), then run cn claude again.",
   modelFlags: ["--model"],
 
-  async prepare({ executable, model, key, available, forwarded, env }) {
+  async prepare({ executable, model, key, available, forwarded, env, mcp }) {
     // Pinning the session ID tells cn exactly which transcript is this run's.
     // A resumed session already has an ID, so nothing is remembered for it.
     const sessionId = resumes(forwarded) ? null : randomUUID();
@@ -105,7 +105,7 @@ const adapter: Harness = {
     });
     let profile;
     try {
-      profile = prepareClaudeProfile(env);
+      profile = prepareClaudeProfile(env, mcp);
     } catch (error) {
       context?.cleanup();
       profile?.cleanup();

@@ -23,7 +23,7 @@ import { askBaaOnce, runKey } from "./commands.js";
 
 const TRY_KEY = "Run cn key to paste a key instead.";
 
-const appRoot = (env: Environment) =>
+export const appRoot = (env: Environment) =>
   (env.CN_APP_URL ?? "https://concentrate.ai").replace(/\/$/, "");
 
 // Server-sent text shown to the user or used in a URL, cleaned and required
