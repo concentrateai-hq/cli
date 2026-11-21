@@ -54,6 +54,7 @@ import {
   writeKey,
   writePreferences,
 } from "../config/settings.js";
+import { readSession } from "../config/session.js";
 import { focusIn, header } from "../ui/brand.js";
 import { ledger, panel } from "../ui/layout.js";
 import { modelItem, modelLegend, modelRight } from "../ui/models.js";
@@ -462,9 +463,14 @@ export function runLogout(env: Environment = process.env) {
       );
     }
   }
+  const signedIn = readSession(env) !== null;
   console.log(
     deleteStoredKey(env)
-      ? ledger("ok", "logout", "saved key removed")
+      ? ledger(
+          "ok",
+          "logout",
+          signedIn ? "signed out, saved key removed" : "saved key removed",
+        )
       : ledger("mute", "logout", "no saved key found"),
   );
   if (env.CONCENTRATE_API_KEY) {
