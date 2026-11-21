@@ -9,6 +9,9 @@
   secret in place, and `--name` names a new key. `cn login` is rolling out
   gradually: where it isn't available yet, cn says so and asks you to paste a
   key instead.
+- MCP servers added inside `cn claude` (for example with `claude mcp add`) are
+  kept between launches. Servers in your own Claude config still win a name
+  clash, and one you remove there is removed under `cn claude` too.
 
 ## 0.1.5 (2026-11-16)
 

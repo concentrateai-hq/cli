@@ -41,13 +41,47 @@ const readQuietly = (file: string): unknown => {
 // recorded here. The user's own file wins; without one, keep the profile's.
 const WELCOME = ["hasCompletedOnboarding", "lastOnboardingVersion"];
 
-// Claude saves .mcp.json approvals and folder trust in the profile's copy.
-// Carry them onto the user's file so they last between launches.
-function carryApprovals(state: Record<string, unknown>, file: string) {
+const serverNames = (value: unknown) =>
+  Object.keys(record(record(value).mcpServers));
+
+// Servers added under cn are the ones the user's file lacked at the last
+// launch, so a server the user removes stays removed. The user's file wins.
+const carryServers = (
+  to: Record<string, unknown>,
+  from: unknown,
+  userHad: unknown[],
+) => {
+  const added = Object.entries(record(record(from).mcpServers)).filter(
+    ([name]) => !userHad.includes(name),
+  );
+  const merged = { ...Object.fromEntries(added), ...record(to.mcpServers) };
+  if (Object.keys(merged).length) to.mcpServers = merged;
+};
+
+// Claude saves .mcp.json approvals, folder trust and MCP servers added under
+// cn in the profile's copy. Carry them onto the user's file between launches.
+function carryApprovals(
+  state: Record<string, unknown>,
+  file: string,
+  userServersFile: string,
+) {
   const previous = readQuietly(file);
+  const userHad = readQuietly(userServersFile);
+  writeJson(userServersFile, {
+    mcpServers: serverNames(state),
+    projects: Object.fromEntries(
+      Object.entries(record(state.projects)).map(([dir, value]) => [
+        dir,
+        serverNames(value),
+      ]),
+    ),
+  });
   for (const key of WELCOME)
     if (!(key in state) && key in record(previous))
       state[key] = record(previous)[key];
+  // No record yet (first launch on this version): carry no servers, as before.
+  if (isRecord(userHad))
+    carryServers(state, previous, list(userHad.mcpServers));
   const projects = record(state.projects);
   for (const [dir, value] of Object.entries(
     record(record(previous).projects),
@@ -60,6 +94,8 @@ function carryApprovals(state: Record<string, unknown>, file: string) {
       if (merged.length) to[key] = merged;
     }
     if (from.hasTrustDialogAccepted === true) to.hasTrustDialogAccepted = true;
+    if (isRecord(userHad))
+      carryServers(to, from, list(record(userHad.projects)[dir]));
     projects[dir] = to;
   }
   state.projects = projects;
@@ -154,7 +190,11 @@ export function prepareClaudeProfile(env: Environment) {
       }
     }
     if (state) {
-      carryApprovals(state, profileState);
+      carryApprovals(
+        state,
+        profileState,
+        path.join(configDir(env), "claude-user-mcp-servers.json"),
+      );
       // Claude sends a device ID with every request, and Concentrate's prompt
       // cache follows it. Without the user's own, Claude would invent a new one
       // each launch, so every session would start from a cold cache.
