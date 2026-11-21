@@ -1,12 +1,14 @@
+import fs from "node:fs";
 import http from "node:http";
+import path from "node:path";
 import net from "node:net";
 import { createHash } from "node:crypto";
 import { test, expect, vi } from "vitest";
 
-import { runLogin, signIn } from "../../src/lib/cli/login.js";
+import { runLogin, sessionToken, signIn } from "../../src/lib/cli/login.js";
 import { runKey } from "../../src/lib/cli/commands.js";
 import { readStoredKey, writeKey } from "../../src/lib/config/settings.js";
-import { readSession } from "../../src/lib/config/session.js";
+import { readSession, writeSession } from "../../src/lib/config/session.js";
 import { interactive, select } from "../../src/lib/ui/widgets.js";
 import { json, tempDir } from "../helpers.js";
 
@@ -27,7 +29,11 @@ const TOKENS = { access_token: "at", refresh_token: "rt", expires_in: 3600 };
 function stubAuth({ token = [json(TOKENS)], device } = {}) {
   const calls = [];
   vi.stubGlobal("fetch", async (url, init) => {
-    calls.push({ url: String(url), body: init?.body?.toString() });
+    calls.push({
+      url: String(url),
+      body: init?.body?.toString(),
+      auth: init?.headers?.Authorization,
+    });
     if (String(url) === "https://app.test/api/cli/config") return json(CONFIG);
     if (String(url) === CONFIG.device_authorization_endpoint)
       return json(device);
@@ -365,4 +371,110 @@ test("cn login --rotate offers to create a key when there's nothing to rotate", 
 
   expect(JSON.parse(calls[5].body)).not.toHaveProperty("rotate");
   expect(readStoredKey(home)).toBe("sk-cn-v1-minted");
+});
+
+// A saved session whose access token expires `inMs` from now.
+const withSession = (inMs) => {
+  const home = loginEnv();
+  writeKey("sk-cn-v1-saved", home);
+  writeSession(
+    { refresh_token: "r", access_token: "a", expires_at: Date.now() + inMs },
+    home,
+  );
+  return home;
+};
+const REFRESHED = { access_token: "a2", refresh_token: "r2", expires_in: 3600 };
+
+test("a valid access token is used without a refresh", async () => {
+  const calls = stubAuth();
+
+  await expect(sessionToken(withSession(3_600_000))).resolves.toBe("a");
+  expect(calls).toHaveLength(0);
+});
+
+test("an expiring access token is refreshed and saved", async () => {
+  const calls = stubAuth({ token: [json(REFRESHED)] });
+  const home = withSession(0);
+
+  await expect(sessionToken(home)).resolves.toBe("a2");
+
+  const sent = new URLSearchParams(calls[1].body);
+  expect(calls[1].url).toBe(CONFIG.token_endpoint);
+  expect(sent.get("grant_type")).toBe("refresh_token");
+  expect(sent.get("refresh_token")).toBe("r");
+  expect(readSession(home)?.refresh_token).toBe("r2");
+});
+
+test("two refreshes at once send one token request", async () => {
+  const calls = stubAuth({ token: [json(REFRESHED)] });
+  const home = withSession(0);
+
+  await expect(
+    Promise.all([sessionToken(home), sessionToken(home)]),
+  ).resolves.toStrictEqual(["a2", "a2"]);
+  expect(calls).toHaveLength(2);
+  expect(calls[1].url).toBe(CONFIG.token_endpoint);
+});
+
+test("a rejected refresh drops the session and keeps the key", async () => {
+  stubAuth({ token: [json({ error: "invalid_grant" }, 400)] });
+  const home = withSession(0);
+
+  await expect(sessionToken(home)).resolves.toBeNull();
+  expect(readSession(home)).toBeNull();
+  expect(readStoredKey(home)).toBe("sk-cn-v1-saved");
+});
+
+test("a server error during refresh keeps the session", async () => {
+  stubAuth({ token: [new Response("Bad gateway", { status: 502 })] });
+  const home = withSession(0);
+
+  await expect(sessionToken(home)).rejects.toThrow();
+  expect(readSession(home)?.refresh_token).toBe("r");
+});
+
+test("a stale lock is taken over", async () => {
+  stubAuth({ token: [json(REFRESHED)] });
+  const home = withSession(0);
+  const lock = path.join(home.CN_CONFIG_HOME, "session.lock");
+  fs.writeFileSync(lock, "");
+  const old = new Date(Date.now() - 60_000);
+  fs.utimesSync(lock, old, old);
+
+  await expect(sessionToken(home)).resolves.toBe("a2");
+});
+
+test("cn login with a live session skips the browser", async () => {
+  const calls = stubAuth({
+    token: [
+      json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+      json({ key: "sk-cn-v1-minted" }, 201),
+    ],
+  });
+  const open = vi.fn();
+  const home = withSession(3_600_000);
+
+  await runLogin({ device: false }, home, open);
+
+  expect(open).not.toHaveBeenCalled();
+  expect(calls[0]).toMatchObject({
+    url: "https://app.test/api/cli/accounts",
+    auth: "Bearer a",
+  });
+});
+
+test("cn login --fresh signs in even with a live session", async () => {
+  stubAuth({
+    device: DEVICE,
+    token: [
+      json(TOKENS),
+      json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+      json({ key: "sk-cn-v1-minted" }, 201),
+    ],
+  });
+  const home = withSession(3_600_000);
+
+  await runLogin({ device: true, fresh: true }, home, silent);
+
+  expect(readSession(home)?.access_token).toBe("at");
 });

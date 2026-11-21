@@ -4,7 +4,13 @@ import { createHash, randomBytes } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { HttpError, requestJson } from "../catalog.js";
-import { type Session, toSession, writeSession } from "../config/session.js";
+import {
+  readSession,
+  type Session,
+  toSession,
+  withSessionLock,
+  writeSession,
+} from "../config/session.js";
 import { readStoredKeyOrNull, writeKey } from "../config/settings.js";
 import { CnError } from "../errors.js";
 import { refreshConfiguredKey } from "../harnesses/tool-config.js";
@@ -174,6 +180,37 @@ async function deviceCode(
   throw new CnError(`The sign-in code expired. ${TRY_KEY}`);
 }
 
+const live = (session: Session) => session.expires_at - Date.now() > 60_000;
+
+/** An access token from the saved session, refreshed when it is about to expire; null without one. */
+export async function sessionToken(env: Environment): Promise<string | null> {
+  const saved = readSession(env);
+  if (!saved || live(saved)) return saved?.access_token ?? null;
+  return withSessionLock(env, async () => {
+    const current = readSession(env);
+    // Another cn process may have refreshed while this one waited
+    if (!current || live(current)) return current?.access_token ?? null;
+    const config = await requestJson(`${appRoot(env)}/api/cli/config`);
+    const body = await postForm(endpoint(config.token_endpoint, "address"), {
+      grant_type: "refresh_token",
+      refresh_token: current.refresh_token,
+      client_id: text(config.client_id, "client id"),
+    });
+    if (body.error === "invalid_grant") {
+      writeSession(null, env); // expired or revoked: sign in again
+      return null;
+    }
+    // Rotation hands back a new refresh token; without one the old stays valid
+    const next = toSession({ refresh_token: current.refresh_token, ...body });
+    if (!next)
+      throw new CnError(
+        `Could not refresh your sign-in (${cleanText(body.error ?? "no response")}).`,
+      );
+    writeSession(next, env);
+    return next.access_token;
+  });
+}
+
 // Best effort: the sign-in URL is always printed too.
 function openBrowser(url: string) {
   const [command, ...args] =
@@ -222,6 +259,7 @@ async function chooseAccount(accounts: Account[], env: Environment) {
 
 type LoginOptions = {
   device: boolean;
+  fresh?: boolean;
   name?: string;
   new?: boolean;
   rotate?: boolean;
@@ -244,11 +282,15 @@ async function login(
   env: Environment,
   open: (url: string) => void,
 ) {
-  const { token, session } = await signIn(env, {
-    device: Boolean(options.device || env.SSH_CONNECTION || env.SSH_TTY),
-    open,
-  });
-  writeSession(session, env);
+  const token =
+    (!options.fresh && (await sessionToken(env))) ||
+    (await signIn(env, {
+      device: Boolean(options.device || env.SSH_CONNECTION || env.SSH_TTY),
+      open,
+    }).then(({ token, session }) => {
+      writeSession(session, env);
+      return token;
+    }));
   const headers = { Authorization: `Bearer ${token}` };
   const listed = await requestJson(`${appRoot(env)}/api/cli/accounts`, {
     headers,
