@@ -12,6 +12,9 @@
 - After you sign in, `cn login` remembers you and goes straight to choosing an
   account. `cn login --fresh` signs in again, and `cn logout` signs you out on
   this computer.
+- MCP servers added inside `cn claude` (for example with `claude mcp add`) are
+  kept between launches. Servers in your own Claude config still win a name
+  clash, and one you remove there is removed under `cn claude` too.
 
 ## 0.1.5 (2026-11-16)
 

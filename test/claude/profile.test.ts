@@ -238,6 +238,58 @@ test(".mcp.json approvals and folder trust given under cn survive the next launc
   expect(merged.userID).toMatch(/^[0-9a-f]{64}$/);
 });
 
+test("MCP servers added under cn survive the next launch; the user's file wins a name clash", () => {
+  const { source, env } = sourceEnv("cn-profile-mcp-");
+  fs.writeFileSync(
+    path.join(source, ".claude.json"),
+    JSON.stringify({
+      mcpServers: { shared: { command: "user" } },
+      projects: { "/p": { mcpServers: { shared: { command: "user" } } } },
+    }),
+  );
+  const first = launch(env);
+  const state = JSON.parse(readProfile(first, ".claude.json"));
+  state.mcpServers.added = { command: "cn" };
+  state.mcpServers.shared = { command: "cn" };
+  state.projects["/p"].mcpServers.local = { command: "cn" };
+  state.projects["/p"].mcpServers.shared = { command: "cn" };
+  state.projects["/q"] = { mcpServers: { other: { command: "cn" } } };
+  fs.writeFileSync(
+    path.join(first.directory, ".claude.json"),
+    JSON.stringify(state),
+  );
+  const merged = JSON.parse(readProfile(launch(env), ".claude.json"));
+  expect(merged.mcpServers).toStrictEqual({
+    shared: { command: "user" },
+    added: { command: "cn" },
+  });
+  expect(merged.projects["/p"].mcpServers).toStrictEqual({
+    shared: { command: "user" },
+    local: { command: "cn" },
+  });
+  expect(merged.projects["/q"].mcpServers).toStrictEqual({
+    other: { command: "cn" },
+  });
+});
+
+test("an MCP server the user removes from their own file is gone under cn too", () => {
+  const { source, env } = sourceEnv("cn-profile-mcp-removed-");
+  const user = path.join(source, ".claude.json");
+  fs.writeFileSync(
+    user,
+    JSON.stringify({
+      mcpServers: { gone: { command: "user" } },
+      projects: { "/p": { mcpServers: { gone: { command: "user" } } } },
+    }),
+  );
+  launch(env);
+  launch(env);
+  fs.writeFileSync(user, JSON.stringify({ projects: { "/p": {} } }));
+  const state = JSON.parse(readProfile(launch(env), ".claude.json"));
+  expect(state.mcpServers).toBe(undefined);
+  expect(state.projects["/p"]).toStrictEqual({});
+});
+
 test("projects follows the current Claude config dir", () => {
   const { root, env } = sourceEnv("cn-profile-projects-");
   const other = path.join(root, "other");
