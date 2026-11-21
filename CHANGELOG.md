@@ -5,9 +5,10 @@
 - `cn login` signs you in with your browser (or a device code over SSH), lets
   you pick your personal account, an organization, or one of its teams, and
   saves an API key there: the key this computer already has there, or a new
-  one. `--new` always creates another key and `--name` names it. This feature
-  is gated by a feature flag for now, if your personal account or organization
-  is not allowed, a 404 will be returned.
+  one. `--new` always creates another key, `--rotate` replaces the saved key's
+  secret in place, and `--name` names a new key. `cn login` is rolling out
+  gradually: where it isn't available yet, cn says so and asks you to paste a
+  key instead.
 
 ## 0.1.5 (2026-11-16)
 

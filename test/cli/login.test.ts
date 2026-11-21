@@ -1,4 +1,5 @@
 import http from "node:http";
+import net from "node:net";
 import { createHash } from "node:crypto";
 import { test, expect, vi } from "vitest";
 
@@ -290,4 +291,69 @@ test("cn login --name names the key; without it the server names it", async () =
   );
   await runLogin({ device: true }, loginEnv(), silent);
   expect(JSON.parse(unnamed[4].body)).not.toHaveProperty("name");
+});
+
+test("PKCE closes a connection the browser opened but never used", async () => {
+  stubAuth();
+  let closed!: Promise<void>;
+  const open = (url) => {
+    const params = new URL(url).searchParams;
+    const callback = new URL(params.get("redirect_uri"));
+    // Browsers open a spare connection ahead of time and may never send on it
+    const spare = net.connect(Number(callback.port), "127.0.0.1");
+    closed = new Promise((resolve) => spare.on("close", () => resolve()));
+    callback.searchParams.set("code", "c");
+    callback.searchParams.set("state", params.get("state"));
+    spare.on("connect", () => http.get(callback, (res) => res.resume()));
+  };
+
+  await signIn(env, { device: false, open });
+
+  await closed;
+});
+
+test("cn login --rotate saves the rotated key", async () => {
+  const calls = stubLogin(
+    json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+    json({ key: "sk-cn-v1-rotated", reused: false, rotated: true }),
+  );
+  const home = loginEnv();
+  writeKey("sk-cn-v1-saved", home);
+
+  await runLogin({ device: true, rotate: true }, home, silent);
+
+  expect(JSON.parse(calls[4].body)).toMatchObject({
+    current_key: "sk-cn-v1-saved",
+    rotate: true,
+  });
+  expect(readStoredKey(home)).toBe("sk-cn-v1-rotated");
+});
+
+test("cn login --rotate with nothing to rotate fails without a terminal", async () => {
+  stubLogin(
+    json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+    json({ error: "Nothing to rotate" }, 409),
+  );
+  const home = loginEnv();
+
+  await expect(
+    runLogin({ device: true, rotate: true }, home, silent),
+  ).rejects.toThrow("Nothing to rotate in Personal");
+  expect(readStoredKey(home)).toBeNull();
+});
+
+test("cn login --rotate offers to create a key when there's nothing to rotate", async () => {
+  const calls = stubLogin(
+    json({ accounts: [{ organization_id: null, name: "Personal" }] }),
+    json({ error: "Nothing to rotate" }, 409),
+    json({ key: "sk-cn-v1-minted", reused: false }, 201),
+  );
+  vi.mocked(interactive).mockReturnValueOnce(true);
+  vi.mocked(select).mockResolvedValueOnce({ value: "new" });
+  const home = loginEnv();
+
+  await runLogin({ device: true, rotate: true }, home, silent);
+
+  expect(JSON.parse(calls[5].body)).not.toHaveProperty("rotate");
+  expect(readStoredKey(home)).toBe("sk-cn-v1-minted");
 });

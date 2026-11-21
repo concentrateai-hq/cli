@@ -50,7 +50,7 @@ Usage:
   cn configure copilot                        Connect the GitHub Copilot app (quit it first)
   cn settings                                 Open interactive settings
   cn config                                   Show key status and default models
-  cn login [--device] [--new] [--name N]      Sign in with your browser and save an API key
+  cn login [--device] [--new|--rotate]        Sign in and save an API key (--name N names it)
   cn key [--no-verify]                        Replace the saved API key
   cn logout                                   Remove the saved API key
   cn baa [on|off]                             Show only models covered by a BAA
@@ -230,13 +230,14 @@ async function dispatch(argv: string[], env: Environment) {
     }
     case "login": {
       const { flags } = parseFlags(rest, {
-        booleans: ["device", "new"],
+        booleans: ["device", "new", "rotate"],
         values: ["name"],
       });
       return runLogin(
         {
           device: Boolean(flags.device),
           new: Boolean(flags.new),
+          rotate: Boolean(flags.rotate),
           name: typeof flags.name === "string" ? flags.name : undefined,
         },
         env,
