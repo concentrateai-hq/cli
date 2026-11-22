@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.6 (2026-11-22)
 
 - `cn login` signs you in with your browser (or a device code over SSH), lets
   you pick your personal account, an organization, or one of its teams, and
