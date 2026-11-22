@@ -140,6 +140,7 @@ test("explicit context override stays fixed while the plugin manages other capab
     key: "sk-test",
     available,
     forwarded: [],
+    mcp: {},
     env: {
       HOME: home,
       CN_CONFIG_HOME: path.join(home, "cn"),

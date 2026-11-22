@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+- `cn login` signs you in with your browser (or a device code over SSH), lets
+  you pick your personal account, an organization, or one of its teams, and
+  saves an API key there: the key this computer already has there, or a new
+  one. `--new` always creates another key, `--rotate` replaces the saved key's
+  secret in place, and `--name` names a new key. `cn login` is rolling out
+  gradually: where it isn't available yet, cn says so and asks you to paste a
+  key instead.
+- After you sign in, `cn login` remembers you and goes straight to choosing an
+  account. `cn login --fresh` signs in again, and `cn logout` signs you out on
+  this computer.
+- MCP servers added inside `cn claude` (for example with `claude mcp add`) are
+  kept between launches. Servers in your own Claude config still win a name
+  clash, and one you remove there is removed under `cn claude` too.
+- When you're signed in with `cn login`, MCP servers your organization manages
+  are added to Claude Code, Codex, OpenCode and Pi at launch. Your own servers
+  win a name clash. If they can't be fetched, cn uses the last ones it saved.
+
 ## 0.1.5 (2026-11-16)
 
 - **Requires Node.js 22.13 or newer.** The installer, `cn update`, and `cn`

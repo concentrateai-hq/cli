@@ -1,7 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { test, expect } from "vitest";
-import { fakeTool, runCn, tempDir, setup } from "../helpers.js";
+import {
+  fakeTool,
+  runCn,
+  tempDir,
+  setup,
+  writeOrgServers,
+} from "../helpers.js";
 import { modelsFor } from "../../src/lib/catalog.js";
 import { writeCodexCatalog } from "../../src/lib/harnesses/pickers.js";
 
@@ -111,4 +117,38 @@ test("the Codex catalog ranks models in cn's order, first model first", async ()
     { slug: "b", priority: 2 },
     { slug: "c", priority: 3 },
   ]);
+});
+
+test("codex gets org MCP servers as overrides, except names the user defines", () => {
+  const { bin, config, env } = setup();
+  const record = fakeTool(bin, "codex");
+  writeOrgServers(config, "sk-test", {
+    docs: { url: "https://docs.example/mcp" },
+    mine: { url: "https://org.example/mcp" },
+    forwarded: { url: "https://org.example/f" },
+    inline: { url: "https://org.example/i" },
+  });
+  fs.writeFileSync(
+    path.join(env.CODEX_HOME, "config.toml"),
+    '[mcp_servers.mine]\ncommand = "echo"\n',
+  );
+  const result = runCn(
+    [
+      "codex",
+      "--",
+      "-c",
+      'mcp_servers.forwarded.command="x"',
+      "-c",
+      'mcp_servers.inline={command="y"}',
+      "exec",
+      "hi",
+    ],
+    { env },
+  );
+  expect(result.status, result.stderr).toBe(0);
+  const joined = record().args.join("\n");
+  expect(joined).toContain('mcp_servers.docs.url="https://docs.example/mcp"');
+  expect(joined).not.toContain("mcp_servers.mine.url");
+  expect(joined).not.toContain("mcp_servers.forwarded.url");
+  expect(joined).not.toContain("mcp_servers.inline.url");
 });

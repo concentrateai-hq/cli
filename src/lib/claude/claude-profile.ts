@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { configDir, writeJson } from "../config/settings.js";
-import type { Environment } from "../types.js";
+import type { Environment, McpServers } from "../types.js";
 import { errorCode, isRecord, record } from "../validation.js";
 
 const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
@@ -41,13 +41,54 @@ const readQuietly = (file: string): unknown => {
 // recorded here. The user's own file wins; without one, keep the profile's.
 const WELCOME = ["hasCompletedOnboarding", "lastOnboardingVersion"];
 
-// Claude saves .mcp.json approvals and folder trust in the profile's copy.
-// Carry them onto the user's file so they last between launches.
-function carryApprovals(state: Record<string, unknown>, file: string) {
+const serverNames = (value: unknown) =>
+  Object.keys(record(record(value).mcpServers));
+
+// Servers added under cn are the ones neither the user's file nor the org had
+// at the last launch, so a removed server stays removed. The user's file wins.
+const carryServers = (
+  to: Record<string, unknown>,
+  from: unknown,
+  userHad: unknown[],
+) => {
+  const added = Object.entries(record(record(from).mcpServers)).filter(
+    ([name]) => !userHad.includes(name),
+  );
+  const merged = { ...Object.fromEntries(added), ...record(to.mcpServers) };
+  if (Object.keys(merged).length) to.mcpServers = merged;
+};
+
+// Claude saves .mcp.json approvals, folder trust and MCP servers added under
+// cn in the profile's copy. Carry them onto the user's file between launches.
+function carryApprovals(
+  state: Record<string, unknown>,
+  file: string,
+  userServersFile: string,
+  org: McpServers,
+) {
   const previous = readQuietly(file);
+  const userHad = readQuietly(userServersFile);
+  writeJson(userServersFile, {
+    mcpServers: serverNames(state),
+    projects: Object.fromEntries(
+      Object.entries(record(state.projects)).map(([dir, value]) => [
+        dir,
+        serverNames(value),
+      ]),
+    ),
+    org: Object.keys(org),
+  });
   for (const key of WELCOME)
     if (!(key in state) && key in record(previous))
       state[key] = record(previous)[key];
+  // No record yet (first launch on this version): carry no servers, as before.
+  if (isRecord(userHad))
+    carryServers(state, previous, [
+      ...list(userHad.mcpServers),
+      ...list(userHad.org),
+    ]);
+  if (Object.keys(org).length)
+    state.mcpServers = { ...org, ...record(state.mcpServers) };
   const projects = record(state.projects);
   for (const [dir, value] of Object.entries(
     record(record(previous).projects),
@@ -60,6 +101,8 @@ function carryApprovals(state: Record<string, unknown>, file: string) {
       if (merged.length) to[key] = merged;
     }
     if (from.hasTrustDialogAccepted === true) to.hasTrustDialogAccepted = true;
+    if (isRecord(userHad))
+      carryServers(to, from, list(record(userHad.projects)[dir]));
     projects[dir] = to;
   }
   state.projects = projects;
@@ -87,7 +130,7 @@ export const claudeProfileDir = (env: Environment) =>
 
 // Claude writes /model selections to its user settings even when launched with
 // --settings, so cn keeps its own permanent profile; sign-ins made there last.
-export function prepareClaudeProfile(env: Environment) {
+export function prepareClaudeProfile(env: Environment, mcp: McpServers = {}) {
   const home = env.HOME || os.homedir();
   const source = env.CLAUDE_CONFIG_DIR || path.join(home, ".claude");
   const directory = claudeProfileDir(env);
@@ -154,7 +197,12 @@ export function prepareClaudeProfile(env: Environment) {
       }
     }
     if (state) {
-      carryApprovals(state, profileState);
+      carryApprovals(
+        state,
+        profileState,
+        path.join(configDir(env), "claude-user-mcp-servers.json"),
+        mcp,
+      );
       // Claude sends a device ID with every request, and Concentrate's prompt
       // cache follows it. Without the user's own, Claude would invent a new one
       // each launch, so every session would start from a cold cache.

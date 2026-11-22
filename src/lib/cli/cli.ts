@@ -31,6 +31,7 @@ import { interactive } from "../ui/widgets.js";
 import { changesSince, readChangelog } from "../changelog.js";
 import { offerUpdate, refreshConfiguredTools, runUpdate } from "./update.js";
 import { version } from "../version.js";
+import { runLogin } from "./login.js";
 
 const HELP = `cn - Concentrate AI: one key for every coding agent (beta)
 
@@ -49,8 +50,9 @@ Usage:
   cn configure copilot                        Connect the GitHub Copilot app (quit it first)
   cn settings                                 Open interactive settings
   cn config                                   Show key status and default models
+  cn login [--device] [--new|--rotate]        Sign in and save an API key (--name N, --fresh)
   cn key [--no-verify]                        Replace the saved API key
-  cn logout                                   Remove the saved API key
+  cn logout                                   Sign out and remove the saved API key
   cn baa [on|off]                             Show only models covered by a BAA
   cn reset [--yes] [--sessions]               Clear everything cn saved and start fresh
   cn model [<tool> [<model-id>]]              Show or change default models
@@ -223,6 +225,22 @@ async function dispatch(argv: string[], env: Environment) {
       const { flags } = parseFlags(rest, { booleans: ["no-verify", "models"] });
       return runSetup(
         { verify: !flags["no-verify"], models: Boolean(flags.models) },
+        env,
+      );
+    }
+    case "login": {
+      const { flags } = parseFlags(rest, {
+        booleans: ["device", "fresh", "new", "rotate"],
+        values: ["name"],
+      });
+      return runLogin(
+        {
+          device: Boolean(flags.device),
+          fresh: Boolean(flags.fresh),
+          new: Boolean(flags.new),
+          rotate: Boolean(flags.rotate),
+          name: typeof flags.name === "string" ? flags.name : undefined,
+        },
         env,
       );
     }

@@ -25,6 +25,7 @@ import {
   writePreferences,
 } from "../config/settings.js";
 import { ledger } from "../ui/layout.js";
+import { orgMcpServers } from "./org-servers.js";
 import { hasOption, resolveSessionArgs } from "../sessions.js";
 
 export { which } from "../executables.js";
@@ -152,6 +153,8 @@ export async function launch(
       `Codex is limited to OpenAI models for now. ${override} is not supported.`,
       EXIT.USAGE,
     );
+  // Awaited after the catalog, so a stray rejection must not go unhandled.
+  const mcp = orgMcpServers(key, env).catch(() => ({}));
   let catalog: Model[] | undefined;
   try {
     catalog = (await fetchCatalog({ env })).models;
@@ -185,6 +188,7 @@ export async function launch(
     available,
     forwarded,
     env,
+    mcp: await mcp,
   });
   const childEnv = { ...env, ...prepared.env };
   for (const name of prepared.unset ?? []) delete childEnv[name];

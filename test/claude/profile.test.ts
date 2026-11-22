@@ -130,8 +130,8 @@ test("cn claude hides Claude's classifier billing notice without touching the us
   expect(fs.readFileSync(user, "utf8")).toBe(before);
 });
 
-const launch = (env) => {
-  const profile = prepareClaudeProfile(env);
+const launch = (env, mcp = {}) => {
+  const profile = prepareClaudeProfile(env, mcp);
   profile.cleanup();
   return profile;
 };
@@ -238,6 +238,58 @@ test(".mcp.json approvals and folder trust given under cn survive the next launc
   expect(merged.userID).toMatch(/^[0-9a-f]{64}$/);
 });
 
+test("MCP servers added under cn survive the next launch; the user's file wins a name clash", () => {
+  const { source, env } = sourceEnv("cn-profile-mcp-");
+  fs.writeFileSync(
+    path.join(source, ".claude.json"),
+    JSON.stringify({
+      mcpServers: { shared: { command: "user" } },
+      projects: { "/p": { mcpServers: { shared: { command: "user" } } } },
+    }),
+  );
+  const first = launch(env);
+  const state = JSON.parse(readProfile(first, ".claude.json"));
+  state.mcpServers.added = { command: "cn" };
+  state.mcpServers.shared = { command: "cn" };
+  state.projects["/p"].mcpServers.local = { command: "cn" };
+  state.projects["/p"].mcpServers.shared = { command: "cn" };
+  state.projects["/q"] = { mcpServers: { other: { command: "cn" } } };
+  fs.writeFileSync(
+    path.join(first.directory, ".claude.json"),
+    JSON.stringify(state),
+  );
+  const merged = JSON.parse(readProfile(launch(env), ".claude.json"));
+  expect(merged.mcpServers).toStrictEqual({
+    shared: { command: "user" },
+    added: { command: "cn" },
+  });
+  expect(merged.projects["/p"].mcpServers).toStrictEqual({
+    shared: { command: "user" },
+    local: { command: "cn" },
+  });
+  expect(merged.projects["/q"].mcpServers).toStrictEqual({
+    other: { command: "cn" },
+  });
+});
+
+test("an MCP server the user removes from their own file is gone under cn too", () => {
+  const { source, env } = sourceEnv("cn-profile-mcp-removed-");
+  const user = path.join(source, ".claude.json");
+  fs.writeFileSync(
+    user,
+    JSON.stringify({
+      mcpServers: { gone: { command: "user" } },
+      projects: { "/p": { mcpServers: { gone: { command: "user" } } } },
+    }),
+  );
+  launch(env);
+  launch(env);
+  fs.writeFileSync(user, JSON.stringify({ projects: { "/p": {} } }));
+  const state = JSON.parse(readProfile(launch(env), ".claude.json"));
+  expect(state.mcpServers).toBe(undefined);
+  expect(state.projects["/p"]).toStrictEqual({});
+});
+
 test("projects follows the current Claude config dir", () => {
   const { root, env } = sourceEnv("cn-profile-projects-");
   const other = path.join(root, "other");
@@ -312,4 +364,39 @@ test("the user's own welcome flags and theme win over the profile's", () => {
   expect(JSON.parse(readProfile(launch(env), "settings.json")).theme).toBe(
     "light",
   );
+});
+
+const ORG = { docs: { type: "http", url: "https://docs.example/mcp" } };
+
+test("org MCP servers are added to the profile; the user's own entry wins a name clash", () => {
+  const { source, env } = sourceEnv("cn-profile-org-");
+  fs.writeFileSync(
+    path.join(source, ".claude.json"),
+    JSON.stringify({ mcpServers: { shared: { command: "user" } } }),
+  );
+  const profile = launch(env, {
+    ...ORG,
+    shared: { type: "http", url: "https://org.example/mcp" },
+  });
+  expect(
+    JSON.parse(readProfile(profile, ".claude.json")).mcpServers,
+  ).toStrictEqual({
+    shared: { command: "user" },
+    docs: { type: "http", url: "https://docs.example/mcp" },
+  });
+});
+
+test("a server the org removes is gone on the next launch; servers added under cn stay", () => {
+  const { source, env } = sourceEnv("cn-profile-org-removed-");
+  fs.writeFileSync(path.join(source, ".claude.json"), "{}");
+  const first = launch(env, ORG);
+  const state = JSON.parse(readProfile(first, ".claude.json"));
+  state.mcpServers.added = { command: "cn" };
+  fs.writeFileSync(
+    path.join(first.directory, ".claude.json"),
+    JSON.stringify(state),
+  );
+  launch(env, ORG);
+  const after = JSON.parse(readProfile(launch(env), ".claude.json"));
+  expect(after.mcpServers).toStrictEqual({ added: { command: "cn" } });
 });

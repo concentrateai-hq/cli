@@ -4,7 +4,8 @@ import { test, expect } from "vitest";
 import { maskKey } from "../../src/lib/cli/commands.js";
 import { parseFlags, parseLaunchArgs } from "../../src/lib/cli/cli.js";
 import { which } from "../../src/lib/cli/launch.js";
-import { DEFAULT_MODELS } from "../../src/lib/config/settings.js";
+import { DEFAULT_MODELS, writeKey } from "../../src/lib/config/settings.js";
+import { readSession, writeSession } from "../../src/lib/config/session.js";
 import { fakeTool, runCn, setup, tempDir, writeCatalog } from "../helpers.js";
 
 test("a missing tool fails fast with exit 127, an install hint, and no key or network needed", () => {
@@ -63,7 +64,6 @@ test("argument parsing", () => {
 test("unknown commands and tools exit 2", () => {
   const { env } = setup();
   expect(runCn(["bogus"], { env }).status).toBe(2);
-  expect(runCn(["login"], { env }).status).toBe(2);
   expect(runCn(["model", "nope"], { env }).status).toBe(2);
   expect(runCn(["models", "--limit", "0"], { env }).status).toBe(2);
 });
@@ -102,6 +102,15 @@ test("setup asks only for the key; config, model, and logout work end to end", (
 
   expect(runCn(["logout"], { env }).stdout).toMatch(/saved key removed/);
   expect(runCn(["config"], { env }).stdout).toMatch(/api key\s+missing/);
+});
+
+test("cn logout removes the sign-in along with the key", () => {
+  const { env } = setup({ CONCENTRATE_API_KEY: "" });
+  writeKey("sk-cn-v1-saved", env);
+  writeSession({ refresh_token: "r", access_token: "a", expires_at: 1 }, env);
+
+  expect(runCn(["logout"], { env }).status).toBe(0);
+  expect(readSession(env)).toBeNull();
 });
 
 test("setup --models also asks for each tool's default", () => {

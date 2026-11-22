@@ -1,7 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { test, expect } from "vitest";
-import { fakeTool, runCn, tempDir, setup, writeCatalog } from "../helpers.js";
+import {
+  fakeTool,
+  runCn,
+  tempDir,
+  setup,
+  writeCatalog,
+  writeOrgServers,
+} from "../helpers.js";
 
 test.each([
   [
@@ -285,4 +292,23 @@ require("node:fs").writeFileSync(${JSON.stringify(record)}, JSON.stringify(proce
   expect(seen.CLAUDE_CODE_USE_FOUNDRY).toBe(undefined);
   expect(seen.CN_CLAUDE_KEY).toBe("sk-test");
   expect(seen.ANTHROPIC_BASE_URL).toBe("https://api.concentrate.ai");
+});
+
+test("cn claude passes the saved org MCP servers to Claude's profile", () => {
+  const { bin, config, env } = setup();
+  fakeTool(bin, "claude");
+  writeOrgServers(config, "sk-test", {
+    docs: { url: "https://docs.example/mcp" },
+  });
+  const result = runCn(["claude", "--", "-p", "hi"], { env });
+  expect(result.status, result.stderr).toBe(0);
+  const state = JSON.parse(
+    fs.readFileSync(
+      path.join(config, "claude-profile", ".claude.json"),
+      "utf8",
+    ),
+  );
+  expect(state.mcpServers).toStrictEqual({
+    docs: { type: "http", url: "https://docs.example/mcp" },
+  });
 });

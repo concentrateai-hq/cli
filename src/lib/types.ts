@@ -4,6 +4,8 @@ export type HarnessId = "claude" | "codex" | "opencode" | "pi";
 export type ConfigurableToolId = HarnessId | DesktopAppId;
 export type DesktopAppId = "cursor" | "copilot";
 export type Preferences = Record<HarnessId, string>;
+// Remote MCP servers an organization adds to every tool, by name.
+export type McpServers = Record<string, { type: "http"; url: string }>;
 export type Effort =
   "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 // US dollars per million tokens.
@@ -44,6 +46,7 @@ export interface PrepareOptions {
   available: Model[];
   forwarded: string[];
   env: Environment;
+  mcp: McpServers;
 }
 export interface PreparedHarness {
   args: string[];

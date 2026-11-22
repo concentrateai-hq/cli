@@ -1,7 +1,8 @@
-import { openCodeHeaders } from "./app-headers.js";
+import { openCodeDocuments, openCodeHeaders } from "./app-headers.js";
 import type { Harness } from "../types.js";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CnError } from "../errors.js";
+import { record } from "../validation.js";
 import { optionValue } from "../sessions.js";
 
 import { API_ROOT } from "../catalog.js";
@@ -25,14 +26,35 @@ const adapter: Harness = {
     return (out.stdout ?? "").trim().split("\n")[0] || null;
   },
 
-  async prepare({ executable, model, key, available, forwarded, env }) {
+  async prepare({ executable, model, key, available, forwarded, env, mcp }) {
     const modern = supportsStandalone(executable);
-    const config = JSON.stringify(
-      opencodeConfig(API_ROOT, model, available, {
+    // cn's inline config outranks the user's files, and a same-named server
+    // replaces the whole entry, so the user's names are skipped.
+    const taken = new Set(
+      openCodeDocuments(env).flatMap((doc) => [
+        ...Object.keys(record(doc.mcp)),
+        ...Object.keys(record(record(doc.mcp).servers)),
+      ]),
+    );
+    const servers = Object.fromEntries(
+      Object.entries(mcp)
+        .filter(([name]) => !taken.has(name))
+        .map(([name, { url }]) => [
+          name,
+          modern
+            ? { type: "remote", url }
+            : { type: "remote", url, enabled: true },
+        ]),
+    );
+    const config = JSON.stringify({
+      ...opencodeConfig(API_ROOT, model, available, {
         modern,
         headers: openCodeHeaders(env, modern),
       }),
-    );
+      ...(Object.keys(servers).length
+        ? { mcp: modern ? { servers } : servers }
+        : {}),
+    });
     const session = optionValue(forwarded, "--session", "-s");
     if (session && modern) {
       // v2's full-screen CLI has no --model flag. Its durable session model

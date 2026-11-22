@@ -53,6 +53,10 @@ the session metadata so Claude's native cache diagnostics can skip them. The
 conversation remains shared, and a private backup is saved in
 `claude-session-backups/` under cn's configuration directory. Sessions open in
 another Claude process are not changed.
+When you're signed in with `cn login`, each launch of Claude Code, Codex,
+OpenCode or Pi adds the remote MCP servers your organization manages. A server
+you define yourself with the same name wins. If the list can't be fetched, cn uses the
+last one it saved and says so; if your sign-in expired, run `cn login` again.
 Codex's picker includes sessions started with other providers. Pi uses its normal
 session directory and its own session picker; explicit `--session-dir` overrides
 are respected. Older sessions created under cn's `pi-sessions/` directory remain
@@ -160,8 +164,9 @@ for differences between permanent configuration and a session launched through `
 | `cn reset <tool>`     | Restore that tool’s previous settings                           |
 | `cn setup`            | Set up your API key                                             |
 | `cn config`           | Show key status, default models, and routing status             |
+| `cn login`            | Sign in and save an API key (`--device`, `--new`, `--rotate`, `--name`, `--fresh`) |
 | `cn key`              | Replace the saved API key                                       |
-| `cn logout`           | Remove the saved API key                                        |
+| `cn logout`           | Sign out and remove the saved API key                           |
 | `cn doctor`           | Check tool installations and key status                         |
 | `cn doctor <tool>`    | Test a tool's API route with a live request                     |
 | `cn update`           | Update cn, then refresh configured tools (`--check` only looks) |

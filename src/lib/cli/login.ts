@@ -1,10 +1,16 @@
 import http from "node:http";
-import os from "node:os";
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { HttpError, requestJson } from "../catalog.js";
+import {
+  readSession,
+  type Session,
+  toSession,
+  withSessionLock,
+  writeSession,
+} from "../config/session.js";
 import { readStoredKeyOrNull, writeKey } from "../config/settings.js";
 import { CnError } from "../errors.js";
 import { refreshConfiguredKey } from "../harnesses/tool-config.js";
@@ -17,7 +23,7 @@ import { askBaaOnce, runKey } from "./commands.js";
 
 const TRY_KEY = "Run cn key to paste a key instead.";
 
-const appRoot = (env: Environment) =>
+export const appRoot = (env: Environment) =>
   (env.CN_APP_URL ?? "https://concentrate.ai").replace(/\/$/, "");
 
 // Server-sent text shown to the user or used in a URL, cleaned and required
@@ -47,13 +53,16 @@ function endpoint(value: unknown, what: string) {
   return url.href;
 }
 
-function accessToken(body: Record<string, unknown>) {
+function signedIn(body: Record<string, unknown>) {
   if (body.error)
     throw new CnError(`Sign-in failed (${cleanText(body.error)}). ${TRY_KEY}`);
-  return text(body.access_token, "access token");
+  return {
+    token: text(body.access_token, "access token"),
+    session: toSession(body),
+  };
 }
 
-/** Signs in to Concentrate AI in the browser or with a device code; returns the access token. */
+/** Signs in to Concentrate AI in the browser or with a device code; returns the access token and session. */
 export async function signIn(
   env: Environment,
   {
@@ -61,7 +70,7 @@ export async function signIn(
     open,
     timeoutMs = 300_000,
   }: { device: boolean; open: (url: string) => void; timeoutMs?: number },
-): Promise<string> {
+): Promise<{ token: string; session: Session | null }> {
   const config = await requestJson(`${appRoot(env)}/api/cli/config`);
   const clientId = text(config.client_id, "client id");
   const tokenUrl = endpoint(config.token_endpoint, "address");
@@ -125,7 +134,7 @@ async function browserCode(
       `Opening your browser to sign in. If it doesn't open, visit:\n  ${url}`,
     );
     open(url);
-    return accessToken(
+    return signedIn(
       await postForm(tokenUrl, {
         grant_type: "authorization_code",
         code: await code,
@@ -136,6 +145,8 @@ async function browserCode(
     );
   } finally {
     clearTimeout(timer);
+    // Browsers keep spare connections open, which would keep cn from exiting
+    server.closeAllConnections();
     server.close();
   }
 }
@@ -164,9 +175,41 @@ async function deviceCode(
       client_id: clientId,
     });
     if (body.error === "slow_down") interval += 5;
-    else if (body.error !== "authorization_pending") return accessToken(body);
+    else if (body.error !== "authorization_pending") return signedIn(body);
   }
   throw new CnError(`The sign-in code expired. ${TRY_KEY}`);
+}
+
+const live = (session: Session) => session.expires_at - Date.now() > 60_000;
+
+/** An access token from the saved session, refreshed when it is about to expire; null without one. */
+export async function sessionToken(env: Environment): Promise<string | null> {
+  const saved = readSession(env);
+  if (!saved || live(saved)) return saved?.access_token ?? null;
+  // Fetched before locking, so the lock is held for a single request
+  const config = await requestJson(`${appRoot(env)}/api/cli/config`);
+  return withSessionLock(env, async () => {
+    const current = readSession(env);
+    // Another cn process may have refreshed while this one waited
+    if (!current || live(current)) return current?.access_token ?? null;
+    const body = await postForm(endpoint(config.token_endpoint, "address"), {
+      grant_type: "refresh_token",
+      refresh_token: current.refresh_token,
+      client_id: text(config.client_id, "client id"),
+    });
+    if (body.error === "invalid_grant") {
+      writeSession(null, env); // expired or revoked: sign in again
+      return null;
+    }
+    // Rotation hands back a new refresh token; without one the old stays valid
+    const next = toSession({ refresh_token: current.refresh_token, ...body });
+    if (!next)
+      throw new CnError(
+        `Could not refresh your sign-in (${cleanText(body.error ?? "no response")}).`,
+      );
+    writeSession(next, env);
+    return next.access_token;
+  });
 }
 
 // Best effort: the sign-in URL is always printed too.
@@ -182,20 +225,28 @@ function openBrowser(url: string) {
     .unref();
 }
 
-async function chooseAccount(
-  accounts: { organization_id: string | null; name: string }[],
-  env: Environment,
-) {
+type Account = {
+  organization_id: string | null;
+  team_id: string | null;
+  name: string;
+};
+
+async function chooseAccount(accounts: Account[], env: Environment) {
   if (accounts.length === 1) return accounts[0];
   if (!interactive(env))
     throw new CnError(
       `Choosing an account needs an interactive terminal. ${TRY_KEY}`,
     );
+  const firstTeam = accounts.findIndex((a) => a.team_id !== null);
   const choice = await select(
     {
       title: "Create an API key in",
-      // Start on the first organization; Personal is the fallback, not the default
-      initial: String(accounts.findIndex((a) => a.organization_id !== null)),
+      // Start on the first team, else the first organization; Personal is the fallback
+      initial: String(
+        firstTeam >= 0
+          ? firstTeam
+          : accounts.findIndex((a) => a.organization_id !== null),
+      ),
       items: accounts.map((account, index) => ({
         value: String(index),
         label: account.name,
@@ -207,9 +258,17 @@ async function chooseAccount(
   return accounts[Number(choice.value)];
 }
 
+type LoginOptions = {
+  device: boolean;
+  fresh?: boolean;
+  name?: string;
+  new?: boolean;
+  rotate?: boolean;
+};
+
 /** cn login: sign in, pick an account, and save a new API key for it. */
 export function runLogin(
-  options: { device: boolean },
+  options: LoginOptions,
   env: Environment = process.env,
   open = openBrowser,
 ) {
@@ -220,21 +279,42 @@ export function runLogin(
 }
 
 async function login(
-  { device }: { device: boolean },
+  options: LoginOptions,
   env: Environment,
   open: (url: string) => void,
 ) {
-  const token = await signIn(env, {
-    device: Boolean(device || env.SSH_CONNECTION || env.SSH_TTY),
-    open,
+  const signInAgain = () =>
+    signIn(env, {
+      device: Boolean(options.device || env.SSH_CONNECTION || env.SSH_TTY),
+      open,
+    }).then(({ token, session }) => {
+      writeSession(session, env);
+      return token;
+    });
+  // A saved sign-in that can't be refreshed falls back to signing in
+  const reused = options.fresh
+    ? null
+    : await sessionToken(env).catch(() => null);
+  if (reused)
+    console.log(
+      ledger("info", "login", "using your saved sign-in (--fresh to switch)"),
+    );
+  let token = reused ?? (await signInAgain());
+  const listAccounts = () =>
+    requestJson(`${appRoot(env)}/api/cli/accounts`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch((error) => {
+      if (error instanceof HttpError && error.status === 404) return null;
+      throw error;
+    });
+  const listed = await listAccounts().catch(async (error) => {
+    if (!(reused && error instanceof HttpError && error.status === 401))
+      throw error;
+    writeSession(null, env); // the server no longer accepts the saved sign-in
+    token = await signInAgain();
+    return listAccounts();
   });
   const headers = { Authorization: `Bearer ${token}` };
-  const listed = await requestJson(`${appRoot(env)}/api/cli/accounts`, {
-    headers,
-  }).catch((error) => {
-    if (error instanceof HttpError && error.status === 404) return null;
-    throw error;
-  });
   if (!listed) {
     console.log(
       ledger(
@@ -252,32 +332,59 @@ async function login(
         typeof account.organization_id === "string"
           ? account.organization_id
           : null,
+      team_id: typeof account.team_id === "string" ? account.team_id : null,
       name: cleanText(account.name, 80),
     }));
   if (accounts.length === 0)
     throw new CnError(`Sign-in returned no accounts. ${TRY_KEY}`);
   const account = await chooseAccount(accounts, env);
 
-  const minted = await requestJson(`${appRoot(env)}/api/cli/keys`, {
-    headers,
-    body: {
-      organization_id: account.organization_id,
-      name: `cn on ${os.hostname()}`.slice(0, 64),
-      // Kept instead of minting another when it is already yours in that account
-      current_key: readStoredKeyOrNull(env) ?? undefined,
-    },
-  }).catch((error) => {
-    throw error instanceof HttpError && error.status === 403
-      ? new CnError(
-          `Your role can't create API keys in ${account.name}. Ask an owner of that organization.`,
-        )
-      : error;
+  const request = (body: Record<string, unknown>) =>
+    requestJson(`${appRoot(env)}/api/cli/keys`, {
+      headers,
+      body: {
+        organization_id: account.organization_id,
+        team_id: account.team_id,
+        // Without one the server names it after you and the date
+        name: options.name,
+        ...body,
+      },
+    });
+  const stored = readStoredKeyOrNull(env) ?? undefined;
+  const minted = await request(
+    options.rotate
+      ? { current_key: stored, rotate: true }
+      : // Kept instead of minting another when it is already yours in that account
+        { current_key: options.new ? undefined : stored },
+  ).catch(async (error) => {
+    if (!(error instanceof HttpError && error.status === 409)) throw error;
+    const nothing = `Nothing to rotate in ${account.name}.`;
+    if (!interactive(env))
+      throw new CnError(`${nothing} Run cn login --new to create a key there.`);
+    const choice = await select(
+      {
+        title: `${nothing} Create a new key instead?`,
+        initial: "new",
+        items: [
+          { value: "new", label: "Create a new key" },
+          { value: "cancel", label: "Cancel" },
+        ],
+      },
+      env,
+    );
+    if (choice.cancel || choice.value !== "new")
+      throw new CnError("Cancelled", 130);
+    return request({});
   });
   if (!minted.reused) {
     writeKey(minted.key, env);
     refreshConfiguredKey(env);
   }
-  const saved = minted.reused ? "kept your saved key" : "key saved";
+  const saved = minted.rotated
+    ? "key rotated"
+    : minted.reused
+      ? "kept your saved key"
+      : "key saved";
   console.log(ledger("ok", "login", `${saved} for ${account.name}`));
   await askBaaOnce(env);
   return 0;

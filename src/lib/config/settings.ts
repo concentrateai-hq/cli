@@ -199,7 +199,7 @@ export function readStoredKeyOrNull(env: Environment = process.env) {
 }
 
 export function readStoredKey(env: Environment = process.env) {
-  const file = path.join(configDir(env), "credentials.json");
+  const file = credentialsFile(env);
   const value = readJson(file).api_key;
   if (typeof value !== "string" || !value.trim()) return null;
   if (!isApiKey(value.trim()))
@@ -246,11 +246,25 @@ export function writeKey(value: unknown, env: Environment = process.env) {
     throw new CnError(
       "That doesn't look like an API key: it has spaces or control characters.",
     );
-  writeJson(path.join(configDir(env), "credentials.json"), { api_key: key });
+  writeJson(credentialsFile(env), { ...keptCredentials(env), api_key: key });
+}
+
+export function credentialsFile(env: Environment = process.env) {
+  return path.join(configDir(env), "credentials.json");
+}
+
+// What a rewrite keeps; a damaged file is replaced whole, as before.
+export function keptCredentials(env: Environment = process.env) {
+  try {
+    return readJson(credentialsFile(env));
+  } catch (error) {
+    if (error instanceof CnError) return {};
+    throw error;
+  }
 }
 
 export function deleteStoredKey(env: Environment = process.env) {
-  const file = path.join(configDir(env), "credentials.json");
+  const file = credentialsFile(env);
   let stat;
   try {
     stat = fs.lstatSync(file);
@@ -272,6 +286,7 @@ const STATE_FILES = [
   "claude-device-id",
   "update-check.json",
   "update-prompt.json",
+  "session.lock",
 ];
 
 // What `cn reset` would remove. Pi chat history only counts when asked for.
