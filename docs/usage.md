@@ -122,6 +122,7 @@ cn configure pi
 cn configure copilot-cli        # GitHub Copilot CLI (terminal)
 cn configure cursor             # Cursor desktop; quit the app first
 cn configure copilot-app        # GitHub Copilot app (desktop, macOS); quit the app first
+cn configure zed                # Zed editor; no need to quit it
 ```
 
 `cn configure copilot` asks whether you mean GitHub Copilot CLI or the GitHub
@@ -152,10 +153,15 @@ For the GitHub Copilot app, open it once, then quit it before Configure or Reset
 models in the app's model picker.
 Setup requires `sqlite3` and `pgrep` (included with macOS).
 
+For Zed, cn adds a "Concentrate" provider to Zed's settings and, if you have no
+default agent model yet, makes Claude Sonnet the default. Zed reloads its
+settings on its own. On macOS the key goes in the keychain; on Linux set
+`CONCENTRATE_API_KEY` for Zed or enter the key in Zed's agent settings.
+
 To restore the settings from before Configure:
 
 ```sh
-cn reset claude                 # Or codex, opencode, pi, copilot-cli, cursor, copilot-app
+cn reset claude                 # Or codex, opencode, pi, copilot-cli, cursor, copilot-app, zed
 ```
 
 Reset preserves settings you edited afterward and reports what it kept. Shell

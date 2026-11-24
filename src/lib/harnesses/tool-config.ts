@@ -17,6 +17,12 @@ import {
   resetCopilotCli,
 } from "../config/copilot-cli-config.js";
 import {
+  configureZed,
+  refreshZedKey,
+  resetZed,
+  zedConfigured,
+} from "../config/zed-config.js";
+import {
   appHeaders,
   codexHeaderConfig,
   configDocument,
@@ -85,7 +91,9 @@ export const toolConfigured = (
       ? copilotConfigured(env)
       : id === "copilot-cli"
         ? copilotCliConfigured(env)
-        : hasNativeSetup(receiptFile(id, env));
+        : id === "zed"
+          ? zedConfigured(env)
+          : hasNativeSetup(receiptFile(id, env));
 // For menus and status lines: settings cn cannot read show as not configured.
 export const toolConfiguredOrFalse = (
   id: ConfigurableToolId,
@@ -183,19 +191,20 @@ export async function configureTool(
   id: ConfigurableToolId,
   env: Environment = process.env,
 ) {
-  if (id === "cursor" || id === "copilot-app") {
+  if (id === "cursor" || id === "copilot-app" || id === "zed") {
     const key = readStoredKey(env);
     if (!key)
       throw new CnError(
-        `Save your Concentrate API key with cn key before configuring ${id === "cursor" ? "Cursor" : "the GitHub Copilot app"}.`,
+        `Save your Concentrate API key with cn key before configuring ${id === "cursor" ? "Cursor" : id === "zed" ? "Zed" : "the GitHub Copilot app"}.`,
       );
     const { models } = await fetchCatalog({ env });
-    return (id === "cursor" ? configureCursor : configureCopilot)(
-      API_ROOT,
-      key,
-      models,
-      env,
-    );
+    return (
+      id === "cursor"
+        ? configureCursor
+        : id === "zed"
+          ? configureZed
+          : configureCopilot
+    )(API_ROOT, key, models, env);
   }
   const adapter = getHarness(id);
   const executable = which(adapter.binary, env.PATH);
@@ -458,6 +467,7 @@ export function resetTool(
   if (id === "cursor") return resetCursor(env);
   if (id === "copilot-app") return resetCopilot(env);
   if (id === "copilot-cli") return resetCopilotCli(env);
+  if (id === "zed") return resetZed(env);
   const files = toolConfigPaths(id, env);
   return withSetupLock(toolSetupDir(id, env), () =>
     resetNativeSetup(receiptFile(id, env), Object.values(files)),
@@ -497,6 +507,17 @@ export function refreshConfiguredKey(env: Environment = process.env) {
       problems.push(
         new CnError(
           `Your cn API key was saved, but GitHub Copilot CLI's key was not refreshed. ${errorMessage(error)}`,
+        ),
+      );
+    }
+  }
+  if (saved && zedConfigured(env)) {
+    try {
+      refreshZedKey(API_ROOT, saved, env);
+    } catch (error) {
+      problems.push(
+        new CnError(
+          `Your cn API key was saved, but Zed's key was not refreshed. ${errorMessage(error)}`,
         ),
       );
     }

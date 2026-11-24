@@ -9,6 +9,10 @@
   `cn reset copilot-app`, so it can't be mixed up with the CLI. Plain
   `cn configure copilot` asks which one you mean. Existing app setups keep
   working.
+- `cn configure zed` connects Zed's agent panel to Concentrate with every
+  model that supports tool calls, with prompt caching on (including Claude).
+  On macOS the key is saved in the keychain for Zed. `cn reset zed` removes
+  it.
 
 ## 0.1.6 (2026-11-22)
 

@@ -1,6 +1,7 @@
 import { getHarness, isHarness, listHarnesses } from "./registry.js";
 import { CURSOR_NOTICE } from "../config/cursor-config.js";
 import { COPILOT_NOTICE } from "../config/copilot-config.js";
+import { ZED_DONE, ZED_NOTICE } from "../config/zed-config.js";
 import type { ConfigurableToolId, DesktopAppId } from "../types.js";
 
 // Desktop apps are configured, never launched, and choose models themselves.
@@ -18,6 +19,13 @@ export const DESKTOP_APPS = {
     notice: COPILOT_NOTICE,
     done: "Done. Open Copilot and pick a model under Concentrate AI.",
     reset: "Removed. Quit and reopen Copilot to see the change.",
+  },
+  zed: {
+    id: "zed",
+    label: "Zed",
+    notice: ZED_NOTICE,
+    done: ZED_DONE,
+    reset: "Removed. Zed picks up the change on its own.",
   },
 } as const;
 export const isDesktopApp = (id: string): id is DesktopAppId =>

@@ -55,6 +55,7 @@ Usage:
   cn configure cursor                         Connect Cursor desktop (quit Cursor first)
   cn configure copilot-cli                    Connect GitHub Copilot CLI (terminal)
   cn configure copilot-app                    Connect the GitHub Copilot app (desktop; quit it first)
+  cn configure zed                            Connect the Zed editor's agent panel
   cn settings                                 Open interactive settings
   cn config                                   Show key status and default models
   cn login [--device] [--new|--rotate]        Sign in and save an API key (--name N, --fresh)

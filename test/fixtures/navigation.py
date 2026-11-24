@@ -92,7 +92,7 @@ with tempfile.TemporaryDirectory(prefix='cn-navigation-') as directory:
         expect('quit')
         press('\x1b[H' + '\x1b[B' * 8 + '\r')  # Home Configure
         expect('Configure a tool')
-        press('\x1b[F\x1b[A\x1b[A')  # Cursor desktop
+        press('\x1b[F\x1b[A\x1b[A\x1b[A')  # Cursor desktop
         expect("Cursor's servers")
         press('\r')  # Needs a saved key; remain inside cn
         expect('Return to the previous menu')

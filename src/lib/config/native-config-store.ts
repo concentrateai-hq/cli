@@ -437,6 +437,30 @@ export function resetNativeSetup(state: string, allowed: string[]) {
   return { reset: true, preserved };
 }
 
+// Some settings are the app's own to change, such as the default model Zed
+// rewrites when the user picks one. Once the user has changed such a setting,
+// it is theirs: cn stops tracking it, so Configure and Reset leave it alone.
+export function releaseChangedSetting(
+  state: string,
+  allowed: string[],
+  file: string,
+  key: string[],
+) {
+  const saved = receipt(state, allowed);
+  if (!saved?.active) return false;
+  const snapshot = saved.files.find((entry) => entry.file === file);
+  const index =
+    snapshot?.changes.findIndex((change) => sameKey(change.key, key)) ?? -1;
+  if (!snapshot || index === -1 || snapshot.format === "text") return false;
+  const current = readConfigFile(file);
+  const now = get(parseConfig(current ?? "", snapshot.format), key);
+  const ours = get(parseConfig(snapshot.written, snapshot.format), key);
+  if (current !== null && isDeepStrictEqual(now, ours)) return false;
+  snapshot.changes.splice(index, 1);
+  writeJson(state, saved);
+  return true;
+}
+
 // Rotates one value cn wrote inside a structured config file, such as Pi's saved key, unless
 // the user has edited that value since. Keeps the first restore snapshot.
 export function refreshNativeValue(
