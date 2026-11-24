@@ -87,21 +87,82 @@ test("each model goes to the provider for its wire format", () => {
       headers: { "X-App": "copilot-cli" },
     },
   ]);
+  const plain = {
+    supports: { toolCalls: true, vision: false, reasoningEffort: false },
+  };
   expect(entries.models).toStrictEqual([
     {
       id: "claude-sonnet-5-5",
       provider: "concentrate-claude",
-      maxPromptTokens: 200000,
+      name: "claude-sonnet-5-5",
+      maxPromptTokens: 168000,
+      maxContextWindowTokens: 200000,
       maxOutputTokens: 32000,
+      capabilities: plain,
     },
     {
       id: "gpt-6.2-sol",
       provider: "concentrate-openai",
-      maxPromptTokens: 200000,
+      name: "gpt-6.2-sol",
+      maxPromptTokens: 168000,
+      maxContextWindowTokens: 200000,
       maxOutputTokens: 32000,
+      capabilities: plain,
     },
-    { id: "deepseek-v4-pro", provider: "concentrate" },
+    {
+      id: "deepseek-v4-pro",
+      provider: "concentrate",
+      name: "deepseek-v4-pro",
+      capabilities: plain,
+    },
   ]);
+});
+
+test("model entries carry the display name and what the model supports", () => {
+  const [entry] = copilotEntries(
+    ROOT,
+    [
+      model("claude-opus-5-5", {
+        name: "Claude Opus 5.5",
+        context: 1000000,
+        output: 128000,
+        image: true,
+        reasoning: true,
+        reasoningSupport: true,
+        efforts: ["low", "medium", "high"],
+      }),
+    ],
+    { apiKey: "sk-x" },
+  ).models;
+  expect(entry).toStrictEqual({
+    id: "claude-opus-5-5",
+    provider: "concentrate-claude",
+    name: "Claude Opus 5.5",
+    maxPromptTokens: 872000,
+    maxContextWindowTokens: 1000000,
+    maxOutputTokens: 128000,
+    capabilities: {
+      supports: { toolCalls: true, vision: true, reasoningEffort: true },
+    },
+  });
+  const noEffort = copilotEntries(
+    ROOT,
+    [
+      model("m", {
+        reasoning: true,
+        reasoningSupport: true,
+        efforts: ["none"],
+      }),
+    ],
+    { apiKey: "sk-x" },
+  ).models[0];
+  expect(noEffort.capabilities.supports.reasoningEffort).toBe(false);
+  // Only a context size: the prompt may use all of it.
+  const contextOnly = copilotEntries(ROOT, [model("c", { output: null })], {
+    apiKey: "sk-x",
+  }).models[0];
+  expect(contextOnly.maxPromptTokens).toBe(200000);
+  expect(contextOnly.maxOutputTokens).toBe(undefined);
 });
 
 test("configure keeps the user's providers, models and other fields; reset restores them", () => {

@@ -76,12 +76,32 @@ export function copilotEntries(
         ...credential,
         headers,
       })),
-    models: listed.map((model) => ({
-      id: model.id,
-      provider: copilotProvider(model.id),
-      ...(model.context ? { maxPromptTokens: model.context } : {}),
-      ...(model.output ? { maxOutputTokens: model.output } : {}),
-    })),
+    models: listed.map(copilotModel),
+  };
+}
+
+// One model entry, with every setting Copilot's /model can show and edit.
+function copilotModel(model: Model) {
+  const { context, output } = model;
+  // Copilot budgets the prompt separately; leave room for the answer.
+  const prompt =
+    context && output && context > output ? context - output : context;
+  return {
+    id: model.id,
+    provider: copilotProvider(model.id),
+    name: model.name,
+    ...(prompt ? { maxPromptTokens: prompt } : {}),
+    ...(context ? { maxContextWindowTokens: context } : {}),
+    ...(output ? { maxOutputTokens: output } : {}),
+    capabilities: {
+      supports: {
+        toolCalls: true,
+        vision: Boolean(model.image),
+        reasoningEffort:
+          (model.reasoningSupport ?? model.reasoning) === true &&
+          (model.efforts ?? []).some((effort) => effort !== "none"),
+      },
+    },
   };
 }
 

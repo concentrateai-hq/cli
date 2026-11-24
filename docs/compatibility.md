@@ -126,7 +126,8 @@ providers and models from `$COPILOT_HOME/providers.json` (default
 
 Copilot CLI chooses the wire format per provider, not per model, so the split
 is by provider. Each catalog model that supports tool calls is listed with its
-context and output limits. cn starts Copilot with
+display name, context window, output limit, a prompt limit of context minus
+output, and whether it supports tool calls, images and reasoning effort. cn starts Copilot with
 `--model <provider>/<model>` unless you pass `--model` yourself. In this file the
 key is read with `apiKeyCommand: "printenv CONCENTRATE_API_KEY"` from the
 session's environment, so it is not written to disk. Organization MCP servers
