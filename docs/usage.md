@@ -11,6 +11,7 @@ cn claude                       # Start Claude Code
 cn codex                        # Start Codex
 cn opencode                     # Start OpenCode
 cn pi                           # Start Pi
+cn copilot                      # Start GitHub Copilot CLI
 ```
 
 Pass tool-specific arguments after `--`:
@@ -29,6 +30,7 @@ cn claude resume <session-id>
 cn codex resume <session-id>
 cn opencode --session <session-id>
 cn pi resume <session-id-or-path>
+cn copilot resume <session-id>
 ```
 
 For Claude, Codex, and Pi, omit the ID to pick a conversation. For OpenCode,
@@ -117,14 +119,19 @@ cn configure claude
 cn configure codex
 cn configure opencode
 cn configure pi
+cn configure copilot-cli        # GitHub Copilot CLI (terminal)
 cn configure cursor             # Cursor desktop; quit the app first
-cn configure copilot            # GitHub Copilot app (macOS); quit the app first
+cn configure copilot-app        # GitHub Copilot app (desktop, macOS); quit the app first
 ```
+
+`cn configure copilot` asks whether you mean GitHub Copilot CLI or the GitHub
+Copilot app.
 
 Save your key with `cn key` first. Configuration writes to the tool’s own settings;
 it does not replace its executable or change your shell profile. Restart the tool
 afterward. Codex, OpenCode, and Pi keep a private copy of your key in their own
-settings; `cn key` updates it and `cn logout` removes it. Claude Code gets the key
+settings, and so does GitHub Copilot CLI in `~/.copilot/providers.json`;
+`cn key` updates it and `cn logout` removes it. Claude Code gets the key
 from `cn` through a small helper.
 
 The saved model list and prices are a snapshot. Run `cn refresh` to update every
@@ -148,7 +155,7 @@ Setup requires `sqlite3` and `pgrep` (included with macOS).
 To restore the settings from before Configure:
 
 ```sh
-cn reset claude                 # Or codex, opencode, pi, cursor, copilot
+cn reset claude                 # Or codex, opencode, pi, copilot-cli, cursor, copilot-app
 ```
 
 Reset preserves settings you edited afterward and reports what it kept. Shell

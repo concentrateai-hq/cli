@@ -11,6 +11,12 @@ import {
   resetCopilot,
 } from "../config/copilot-config.js";
 import {
+  configureCopilotCli,
+  copilotCliConfigured,
+  refreshCopilotCliKey,
+  resetCopilotCli,
+} from "../config/copilot-cli-config.js";
+import {
   appHeaders,
   codexHeaderConfig,
   configDocument,
@@ -75,9 +81,11 @@ export const toolConfigured = (
 ) =>
   id === "cursor"
     ? cursorConfigured(env)
-    : id === "copilot"
+    : id === "copilot-app"
       ? copilotConfigured(env)
-      : hasNativeSetup(receiptFile(id, env));
+      : id === "copilot-cli"
+        ? copilotCliConfigured(env)
+        : hasNativeSetup(receiptFile(id, env));
 // For menus and status lines: settings cn cannot read show as not configured.
 export const toolConfiguredOrFalse = (
   id: ConfigurableToolId,
@@ -175,7 +183,7 @@ export async function configureTool(
   id: ConfigurableToolId,
   env: Environment = process.env,
 ) {
-  if (id === "cursor" || id === "copilot") {
+  if (id === "cursor" || id === "copilot-app") {
     const key = readStoredKey(env);
     if (!key)
       throw new CnError(
@@ -196,6 +204,15 @@ export async function configureTool(
       `${adapter.label} is not installed. ${adapter.installHint}`,
     );
   if (id === "pi") requireSupportedPi(executable);
+  if (id === "copilot-cli") {
+    const key = readStoredKey(env);
+    if (!key)
+      throw new CnError(
+        "Save your key with cn key before configuring GitHub Copilot CLI.",
+      );
+    const { models } = await fetchCatalog({ env });
+    return configureCopilotCli(API_ROOT, key, modelsFor(id, models), env);
+  }
   // Native apps need a saved key; environment-only keys are unavailable from the Dock.
   const key = readStoredKey(env);
   if (!key)
@@ -439,7 +456,8 @@ export function resetTool(
   env: Environment = process.env,
 ) {
   if (id === "cursor") return resetCursor(env);
-  if (id === "copilot") return resetCopilot(env);
+  if (id === "copilot-app") return resetCopilot(env);
+  if (id === "copilot-cli") return resetCopilotCli(env);
   const files = toolConfigPaths(id, env);
   return withSetupLock(toolSetupDir(id, env), () =>
     resetNativeSetup(receiptFile(id, env), Object.values(files)),
@@ -468,6 +486,17 @@ export function refreshConfiguredKey(env: Environment = process.env) {
       problems.push(
         new CnError(
           `Your cn API key was saved, but the GitHub Copilot app's key was not refreshed. ${errorMessage(error)}`,
+        ),
+      );
+    }
+  }
+  if (saved && copilotCliConfigured(env)) {
+    try {
+      refreshCopilotCliKey(saved, env);
+    } catch (error) {
+      problems.push(
+        new CnError(
+          `Your cn API key was saved, but GitHub Copilot CLI's key was not refreshed. ${errorMessage(error)}`,
         ),
       );
     }

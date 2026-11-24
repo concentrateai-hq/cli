@@ -12,14 +12,15 @@ and the coding tools you want to use installed on your `PATH`.
 
 ## Supported tools
 
-| Tool                   | Support                                               |
-| ---------------------- | ----------------------------------------------------- |
-| Claude Code            | Works                                                 |
-| OpenCode               | Works                                                 |
-| Pi                     | Works                                                 |
-| Codex                  | OpenAI models only for now. More models coming soon.  |
-| Cursor (desktop)       | Work in progress. Set up with `cn configure cursor`.  |
-| GitHub Copilot (app)   | Works (macOS). Set up with `cn configure copilot`.    |
+| Tool                         | Support                                                   |
+| ---------------------------- | --------------------------------------------------------- |
+| Claude Code                  | Works                                                     |
+| OpenCode                     | Works                                                     |
+| Pi                           | Works                                                     |
+| GitHub Copilot CLI           | Works. Run `cn copilot`.                                  |
+| Codex                        | OpenAI models only for now. More models coming soon.      |
+| Cursor (desktop)             | Work in progress. Set up with `cn configure cursor`.      |
+| GitHub Copilot app (desktop) | Works (macOS). Set up with `cn configure copilot-app`.    |
 
 ## Install
 
@@ -118,18 +119,38 @@ Work in progress: expect changes.
   completions keep using Cursor's own models.
 - This sets up the editor, not the Cursor command-line tool.
 
+## GitHub Copilot CLI
+
+GitHub Copilot CLI is the `copilot` command in your terminal. The GitHub Copilot
+desktop app is set up separately (see below).
+
+- `cn copilot` starts Copilot CLI on Concentrate. Pick another model with
+  `cn copilot --model <id>` or `/model` inside Copilot. No GitHub sign-in or
+  Copilot plan is needed for Concentrate models.
+- Concentrate shows up as three providers in `/model`: `concentrate-claude`
+  (Claude models), `concentrate-openai` (OpenAI models) and `concentrate`
+  (everything else), so each model uses the API it's fastest and cached on.
+- `cn copilot` adds Concentrate for that session only and keeps your key out of
+  Copilot's files. Models you added to Copilot yourself are still listed.
+- `cn configure copilot-cli` adds the same providers to
+  `~/.copilot/providers.json` so plain `copilot` lists them too. Copilot keeps
+  that key in the file; `cn key` updates it, and `cn reset copilot-cli` or
+  `cn logout` removes cn's providers. Providers you added yourself are left
+  alone.
+- `cn copilot resume [<id>]` and `cn copilot continue` reopen saved sessions.
+
 ## GitHub Copilot app
 
-macOS only for now.
+The GitHub Copilot desktop app. macOS only for now.
 
-- `cn configure copilot` adds a "Concentrate AI" provider with the Concentrate
+- `cn configure copilot-app` adds a "Concentrate AI" provider with the Concentrate
   models that support tool calls to the GitHub Copilot desktop app. If the app is
   open, cn asks you to quit it. Reopen it afterward and pick a model under
   Concentrate AI.
 - Claude models are cached. Other models use Chat Completions for now, so GPT
   can be a little slower on long tasks.
 - The app keeps your key in its local settings database. `cn key` updates it,
-  and `cn reset copilot` or `cn logout` removes the provider. Providers you added
+  and `cn reset copilot-app` or `cn logout` removes the provider. Providers you added
   yourself are left alone.
 
 ## Models

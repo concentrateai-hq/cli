@@ -14,6 +14,7 @@ export const DEFAULT_MODELS = Object.freeze<Preferences>({
   codex: "gpt-6.1-terra",
   opencode: "deepseek-v4-1-flash",
   pi: "deepseek-v4-1-flash",
+  "copilot-cli": "claude-sonnet-5-5",
 });
 
 export const HARNESS_IDS = Object.freeze(
@@ -30,6 +31,7 @@ const TIERS: Record<HarnessId, RegExp> = {
   codex: /^gpt-\d+(?:\.\d+)?-terra$/,
   opencode: DEEPSEEK_FLASH,
   pi: DEEPSEEK_FLASH,
+  "copilot-cli": CLAUDE_SONNET,
 };
 
 export function newestInTier(tier: RegExp, models: Model[]) {

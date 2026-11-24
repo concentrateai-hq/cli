@@ -518,7 +518,7 @@ test.each(launchCases)(
       autoProvider: legacyPreference,
     });
     fs.writeFileSync(
-      path.join(dir, harness),
+      path.join(dir, harness === "copilot-cli" ? "copilot" : harness),
       `#!/usr/bin/env node
 const fs = require('node:fs'), p = require('node:path');
 const args = process.argv.slice(2);
@@ -528,6 +528,7 @@ let catalog;
 if (${JSON.stringify(harness)} === 'pi') catalog = JSON.parse(fs.readFileSync(p.join(process.env.PI_CODING_AGENT_DIR, 'models.json'))).providers.concentrate.models.map(m=>m.id);
 if (${JSON.stringify(harness)} === 'opencode') catalog = Object.keys(JSON.parse(process.env.OPENCODE_CONFIG_CONTENT).provider.concentrate.models);
 if (${JSON.stringify(harness)} === 'claude') { const settings=JSON.parse(args[1]); catalog=settings.modelPicker.options.map(m=>m.model); if (!settings.modelPicker.replaceBuiltInOptions) process.exit(4); }
+if (${JSON.stringify(harness)} === 'copilot-cli') catalog = JSON.parse(fs.readFileSync(process.env.COPILOT_PROVIDERS_CONFIG)).models.map(m=>m.id);
 if (${JSON.stringify(harness)} === 'codex') { const flag=args.find(a=>a.startsWith('model_catalog_json=')); catalog=JSON.parse(fs.readFileSync(JSON.parse(flag.slice('model_catalog_json='.length)))).models.map(m=>m.slug); }
 console.log(JSON.stringify({ args, catalog }));`,
       { mode: 0o755 },
@@ -536,7 +537,11 @@ console.log(JSON.stringify({ args, catalog }));`,
     expect(result.status, result.stderr).toBe(0);
     const actual = JSON.parse(result.stdout);
     expect([...actual.catalog].sort()).toStrictEqual(["gpt-m1", "gpt-m2"]);
-    expect(actual.args.includes("gpt-m1")).toBe(harness !== "opencode");
+    expect(
+      actual.args.includes(
+        harness === "copilot-cli" ? "concentrate-openai/gpt-m1" : "gpt-m1",
+      ),
+    ).toBe(harness !== "opencode");
   },
 );
 

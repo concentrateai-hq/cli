@@ -111,9 +111,44 @@ editor testing remains outstanding.
 Validation covers fixture databases and a Cursor-format gateway request. A full
 Cursor desktop session has not been tested on this machine.
 
+## GitHub Copilot CLI
+
+`cn copilot` runs GitHub Copilot CLI with `COPILOT_PROVIDERS_CONFIG` pointing at a
+private temporary `providers.json`, removed when Copilot exits. It holds your own
+providers and models from `$COPILOT_HOME/providers.json` (default
+`~/.copilot/providers.json`) plus three Concentrate providers, each with an
+`X-App: copilot-cli` header:
+
+- `concentrate-claude`: type `anthropic`, base URL `https://api.concentrate.ai`,
+  for Claude models, which are cached on the Messages API.
+- `concentrate-openai`: type `openai`, `wireApi: "responses"`, for OpenAI models.
+- `concentrate`: type `openai`, `wireApi: "completions"`, for every other model.
+
+Copilot CLI chooses the wire format per provider, not per model, so the split
+is by provider. Each catalog model that supports tool calls is listed with its
+context and output limits. cn starts Copilot with
+`--model <provider>/<model>` unless you pass `--model` yourself. In this file the
+key is read with `apiKeyCommand: "printenv CONCENTRATE_API_KEY"` from the
+session's environment, so it is not written to disk. Organization MCP servers
+are added with `--additional-mcp-config` for the session. Copilot's own login,
+sessions and settings stay in `$COPILOT_HOME`; no GitHub sign-in is needed for
+Concentrate models.
+
+`cn configure copilot-cli` writes the same providers into
+`$COPILOT_HOME/providers.json` with the key as `apiKey`, as Copilot itself does
+for keys added in `/model`, and keeps the file private. Providers and models of
+your own, and any other fields, are kept. A provider of yours that already uses
+one of the three names stops setup. Configure again replaces cn's entries with
+the current catalog; `cn key` rewrites their key; Reset, Logout and global Reset
+remove only them, and delete the file if cn created it and nothing else is left.
+In-session model changes are not saved as cn defaults.
+
+Validation covers fixture files and Copilot CLI 1.0.115 against Concentrate,
+with tool calls on Claude, GPT and DeepSeek models.
+
 ## GitHub Copilot app
 
-`cn configure copilot` configures the GitHub Copilot desktop app on macOS. It
+`cn configure copilot-app` configures the GitHub Copilot desktop app on macOS. It
 requires an initialized app profile (`~/.copilot/data.db`, or `$COPILOT_HOME`),
 a saved Concentrate API key, `sqlite3`, and `pgrep`. Quit the app first; cn checks
 for its `github` process instead of terminating it.
@@ -133,7 +168,9 @@ yet.
 The provider id is kept in cn's restore record. Configure again replaces that
 provider's models with the current catalog, recreating the provider if it was
 deleted in the app. Reset, Logout, and global Reset delete only that provider and
-its models; a provider added in the app's own settings is never changed. `cn key`
+its models; a provider added in the app's own settings is never changed.
+Setups made with `cn configure copilot` before the app was renamed
+`copilot-app` are recognized as the app. `cn key`
 rewrites its header while the app is closed. Windows and Linux are not supported.
 
 Validation covers fixture databases built from the app's schema. A full app

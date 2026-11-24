@@ -273,7 +273,8 @@ export async function resolveSessionArgs(
   args: string[],
   env: Environment,
 ): Promise<string[] | null> {
-  if (target === "claude" || target === "pi") return args;
+  if (target === "claude" || target === "pi" || target === "copilot-cli")
+    return args;
   if (target === "codex") {
     const index =
       args[0] === "resume"

@@ -114,6 +114,7 @@ test("tools without a saved choice start on the newest model in their tier", () 
     codex: "gpt-6.1-terra",
     opencode: "deepseek-v4-1-flash",
     pi: "deepseek-v4-1-flash",
+    "copilot-cli": "claude-sonnet-5-5",
   });
 });
 

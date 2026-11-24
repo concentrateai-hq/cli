@@ -442,6 +442,7 @@ const RESUME_ARGS: Record<HarnessId, string[]> = {
   codex: ["resume"],
   opencode: ["--continue"],
   pi: ["--resume"],
+  "copilot-cli": ["--resume"],
 };
 
 async function resumePicker(
