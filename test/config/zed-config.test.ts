@@ -3,6 +3,9 @@ import path from "node:path";
 import { test, expect } from "vitest";
 import { parse } from "jsonc-parser";
 import {
+  zedInterleavedReasoning,
+  zedReasoningEffort,
+  zedUsesResponses,
   configureZed,
   refreshZedKey,
   resetZed,
@@ -148,6 +151,7 @@ test("Zed Configure on a fresh install adds the provider, a default model, and t
           parallel_tool_calls: true,
           prompt_cache_key: true,
           chat_completions: true,
+          interleaved_reasoning: false,
         },
       },
       {
@@ -160,6 +164,7 @@ test("Zed Configure on a fresh install adds the provider, a default model, and t
           parallel_tool_calls: true,
           prompt_cache_key: true,
           chat_completions: true,
+          interleaved_reasoning: false,
         },
       },
     ],
@@ -294,4 +299,158 @@ test("Zed Configure refuses when no model supports tools", () => {
     /No tool-calling models/,
   );
   expect(fs.existsSync(f.file)).toBe(false);
+});
+
+const model = (fields) => ({
+  name: fields.id,
+  context: 100000,
+  output: 8000,
+  image: false,
+  chat_candidate: true,
+  claude: false,
+  codex: false,
+  reasoning: false,
+  reasoningSupport: null,
+  efforts: null,
+  ...fields,
+});
+
+test("Zed reasoning effort is medium when offered, else the lowest level above none", () => {
+  const thinking = { reasoning: true, reasoningSupport: true };
+  expect(
+    zedReasoningEffort(
+      model({ id: "a", ...thinking, efforts: ["none", "low", "medium"] }),
+    ),
+  ).toBe("medium");
+  expect(
+    zedReasoningEffort(
+      model({ id: "b", ...thinking, efforts: ["high", "xhigh", "max"] }),
+    ),
+  ).toBe("high");
+  expect(
+    zedReasoningEffort(
+      model({ id: "c", ...thinking, efforts: ["none", "minimal", "low"] }),
+    ),
+  ).toBe("minimal");
+  // No levels, only "none", or no reasoning support: no effort is set.
+  expect(zedReasoningEffort(model({ id: "d", ...thinking, efforts: [] }))).toBe(
+    undefined,
+  );
+  expect(
+    zedReasoningEffort(model({ id: "e", ...thinking, efforts: ["none"] })),
+  ).toBe(undefined);
+  expect(
+    zedReasoningEffort(model({ id: "f", efforts: ["low", "medium"] })),
+  ).toBe(undefined);
+});
+
+test("Zed sends Codex's OpenAI models to the Responses endpoint and the rest to Chat Completions", () => {
+  expect(zedUsesResponses(model({ id: "gpt-6.2-sol", codex: true }))).toBe(
+    true,
+  );
+  expect(zedUsesResponses(model({ id: "o3", codex: true }))).toBe(true);
+  // Not run by Codex, open-weight GPT, or another provider's model.
+  expect(zedUsesResponses(model({ id: "gpt-5.5", codex: false }))).toBe(false);
+  expect(zedUsesResponses(model({ id: "gpt-oss-120b", codex: true }))).toBe(
+    false,
+  );
+  expect(
+    zedUsesResponses(model({ id: "claude-sonnet-5-5", codex: true })),
+  ).toBe(false);
+  expect(zedUsesResponses(model({ id: "deepseek-v4-pro", codex: true }))).toBe(
+    false,
+  );
+});
+
+test("Zed sends earlier thinking back only for reasoning models off Claude and Responses", () => {
+  const thinking = { reasoning: true, reasoningSupport: true };
+  expect(
+    zedInterleavedReasoning(model({ id: "deepseek-v4-pro", ...thinking })),
+  ).toBe(true);
+  expect(
+    zedInterleavedReasoning(
+      model({ id: "kimi-k3", reasoning: true, reasoningSupport: null }),
+    ),
+  ).toBe(true);
+  expect(
+    zedInterleavedReasoning(model({ id: "claude-sonnet-5-5", ...thinking })),
+  ).toBe(false);
+  expect(
+    zedInterleavedReasoning(
+      model({ id: "gpt-6.2-sol", codex: true, ...thinking }),
+    ),
+  ).toBe(false);
+  expect(zedInterleavedReasoning(model({ id: "llama-4-maverick" }))).toBe(
+    false,
+  );
+});
+
+test("Zed Configure writes each model's effort, endpoint and reasoning fields", () => {
+  const f = fixture();
+  const thinking = { reasoning: true, reasoningSupport: true };
+  configureZed(
+    ROOT,
+    KEY,
+    [
+      model({
+        id: "claude-sonnet-5-5",
+        claude: true,
+        codex: true,
+        image: true,
+        ...thinking,
+        efforts: ["low", "medium", "high"],
+      }),
+      model({
+        id: "gpt-6.2-sol",
+        codex: true,
+        ...thinking,
+        efforts: ["low", "medium", "high"],
+      }),
+      model({ id: "deepseek-v4-pro", ...thinking, efforts: ["high", "max"] }),
+      model({ id: "llama-4-maverick" }),
+    ],
+    f.env,
+    "darwin",
+  );
+  const written = Object.fromEntries(
+    parse(
+      f.read(),
+    ).language_models.openai_compatible.Concentrate.available_models.map(
+      (entry) => [
+        entry.name,
+        {
+          effort: entry.reasoning_effort,
+          chat: entry.capabilities.chat_completions,
+          interleaved: entry.capabilities.interleaved_reasoning,
+          images: entry.capabilities.images,
+        },
+      ],
+    ),
+  );
+  expect(written).toStrictEqual({
+    "claude-sonnet-5-5": {
+      effort: "medium",
+      chat: true,
+      interleaved: false,
+      images: true,
+    },
+    "gpt-6.2-sol": {
+      effort: "medium",
+      chat: false,
+      interleaved: false,
+      images: false,
+    },
+    "deepseek-v4-pro": {
+      effort: "high",
+      chat: true,
+      interleaved: true,
+      images: false,
+    },
+    "llama-4-maverick": {
+      effort: undefined,
+      chat: true,
+      interleaved: false,
+      images: false,
+    },
+  });
 });

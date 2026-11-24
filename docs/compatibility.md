@@ -186,9 +186,15 @@ place, keeping comments and formatting. It adds
 `https://api.concentrate.ai/v1` and one `available_models` entry per catalog
 model that supports tool calls: the catalog id as `name`, the display name,
 the context size as `max_tokens` (128,000 when unknown), the output limit as
-`max_output_tokens`, and capabilities `tools`, `parallel_tool_calls`,
-`prompt_cache_key`, and `chat_completions` on, with `images` matching the
-model. `prompt_cache_key` lets Claude reuse its prompt cache between turns.
+`max_output_tokens`, and capabilities `tools`, `parallel_tool_calls`, and
+`prompt_cache_key` on, with `images` matching the model. `prompt_cache_key`
+lets Claude reuse its prompt cache between turns. OpenAI models that Codex
+runs set `chat_completions` to false so Zed uses the Responses endpoint; all
+other models, Claude included, use Chat Completions. Reasoning models get a
+`reasoning_effort` (medium when offered, otherwise their lowest level above
+none), which turns on thinking in the agent panel. Reasoning models other than
+Claude and Responses models set `interleaved_reasoning`, so Zed sends their
+earlier thinking back during tool calls.
 When `agent.default_model` is unset, cn sets it to Claude Sonnet under the
 Concentrate provider.
 

@@ -4,7 +4,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { CnError } from "../errors.js";
 import { which } from "../executables.js";
-import { isApiKey } from "../safe.js";
+import { isApiKey, isOpenAiModel } from "../safe.js";
 import { configDir, readJson, writeJson } from "./settings.js";
 import { parseConfig } from "./config-formats.js";
 import {
@@ -62,6 +62,30 @@ export const zedConfigured = (env: Environment = process.env) =>
 
 export const zedApiUrl = (apiRoot: string) => `${apiRoot}/v1`;
 
+// Levels above "none", lowest first.
+const EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
+// OpenAI models that Codex runs go to the Responses endpoint, like in Codex.
+export const zedUsesResponses = (model: Model) =>
+  model.codex && isOpenAiModel(model.id);
+
+// Setting an effort turns on thinking in Zed's agent panel: medium when the
+// model offers it, otherwise its lowest level above none.
+export function zedReasoningEffort(model: Model) {
+  if (!(model.reasoning || model.reasoningSupport)) return undefined;
+  const offered = model.efforts ?? [];
+  if (offered.includes("medium")) return "medium";
+  return EFFORTS.find((level) => offered.includes(level));
+}
+
+// Open-weight reasoning models (DeepSeek, Kimi, GLM, Qwen...) expect their
+// earlier thinking back as reasoning_content during tool calls. Claude and
+// Responses models carry their reasoning differently.
+export const zedInterleavedReasoning = (model: Model) =>
+  Boolean(model.reasoning || model.reasoningSupport) &&
+  !/^claude-/.test(model.id) &&
+  !zedUsesResponses(model);
+
 function zedModels(models: Model[]) {
   const tools = [
     ...new Map(
@@ -70,21 +94,26 @@ function zedModels(models: Model[]) {
         .map((model) => [model.id, model]),
     ).values(),
   ];
-  return tools.map((model) => ({
-    name: model.id,
-    display_name: model.name,
-    // Zed requires a context size; an unknown one gets a safe floor.
-    max_tokens: model.context ?? 128000,
-    ...(model.output ? { max_output_tokens: model.output } : {}),
-    capabilities: {
-      tools: true,
-      images: Boolean(model.image),
-      parallel_tool_calls: true,
-      // Lets Claude and other models reuse the prompt cache between turns.
-      prompt_cache_key: true,
-      chat_completions: true,
-    },
-  }));
+  return tools.map((model) => {
+    const effort = zedReasoningEffort(model);
+    return {
+      name: model.id,
+      display_name: model.name,
+      // Zed requires a context size; an unknown one gets a safe floor.
+      max_tokens: model.context ?? 128000,
+      ...(model.output ? { max_output_tokens: model.output } : {}),
+      ...(effort ? { reasoning_effort: effort } : {}),
+      capabilities: {
+        tools: true,
+        images: Boolean(model.image),
+        parallel_tool_calls: true,
+        // Lets Claude and other models reuse the prompt cache between turns.
+        prompt_cache_key: true,
+        chat_completions: !zedUsesResponses(model),
+        interleaved_reasoning: zedInterleavedReasoning(model),
+      },
+    };
+  });
 }
 
 // --- macOS keychain -------------------------------------------------------
