@@ -8,7 +8,9 @@ import {
   launchProviders,
 } from "../config/copilot-cli-config.js";
 import { hasOption } from "../sessions.js";
-import type { Harness, McpServers } from "../types.js";
+import type { Environment, Harness, McpServers } from "../types.js";
+import { record } from "../validation.js";
+import { configDocument } from "./app-headers.js";
 
 function copilotVersion(executable: string) {
   const out = spawnSync(executable, ["--version"], {
@@ -18,15 +20,42 @@ function copilotVersion(executable: string) {
   return (out.stdout || "").trim().split("\n")[0] || null;
 }
 
-// Org servers are added for this session only; the user's own MCP config wins.
-function mcpArgs(mcp: McpServers) {
-  if (!Object.keys(mcp).length) return [];
-  const mcpServers = Object.fromEntries(
-    Object.entries(mcp).map(([name, { url }]) => [
-      name,
-      { type: "http", url, tools: ["*"] },
-    ]),
+// Server names the user already has in the files Copilot reads: its user
+// config, and .mcp.json or .github/mcp.json from here up to the repository
+// root. A file that won't parse names none; Copilot reports it itself.
+function userServerNames(env: Environment) {
+  const home =
+    env.COPILOT_HOME || path.join(env.HOME || os.homedir(), ".copilot");
+  const files = [path.join(home, "mcp-config.json")];
+  for (let dir = process.cwd(); ; dir = path.dirname(dir)) {
+    files.push(
+      path.join(dir, ".mcp.json"),
+      path.join(dir, ".github", "mcp.json"),
+    );
+    if (fs.existsSync(path.join(dir, ".git")) || path.dirname(dir) === dir)
+      break;
+  }
+  return new Set(
+    files.flatMap((file) => {
+      try {
+        return Object.keys(record(configDocument(file).mcpServers));
+      } catch {
+        return [];
+      }
+    }),
   );
+}
+
+// Org servers are added for this session only. Copilot lets added servers
+// replace the user's own, so names the user already has are left out.
+function mcpArgs(mcp: McpServers, env: Environment) {
+  const taken = userServerNames(env);
+  const mcpServers = Object.fromEntries(
+    Object.entries(mcp)
+      .filter(([name]) => !taken.has(name))
+      .map(([name, { url }]) => [name, { type: "http", url, tools: ["*"] }]),
+  );
+  if (!Object.keys(mcpServers).length) return [];
   return ["--additional-mcp-config", JSON.stringify({ mcpServers })];
 }
 
@@ -56,7 +85,7 @@ const adapter: Harness = {
           ...(hasOption(forwarded, "--model")
             ? []
             : ["--model", copilotModelRef(model)]),
-          ...mcpArgs(mcp),
+          ...mcpArgs(mcp, env),
           ...forwarded,
         ],
         env: { CONCENTRATE_API_KEY: key, COPILOT_PROVIDERS_CONFIG: file },

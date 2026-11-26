@@ -10,7 +10,13 @@ import {
   resetCopilotCli,
 } from "../../src/lib/config/copilot-cli-config.js";
 import { parseHarnessLaunchArgs } from "../../src/lib/cli/cli.js";
-import { writeCatalog, runCn, setup, tempDir } from "../helpers.js";
+import {
+  writeCatalog,
+  writeOrgServers,
+  runCn,
+  setup,
+  tempDir,
+} from "../helpers.js";
 
 const ROOT = "https://api.concentrate.ai";
 const model = (id, extra = {}) => ({
@@ -342,6 +348,49 @@ test("cn copilot --model picks the provider for that model", () => {
     "--model",
     "concentrate-openai/gpt-6.2-sol",
   ]);
+});
+
+// A repository inside a folder whose own .mcp.json Copilot never reads.
+function copilotMcp(userConfig) {
+  const { bin, config, env } = setup();
+  writeCatalog(config, models);
+  writeOrgServers(config, "sk-test", {
+    docs: { type: "http", url: "https://docs.example/mcp" },
+    mine: { type: "http", url: "https://org.example/mine" },
+    shared: { type: "http", url: "https://org.example/shared" },
+    team: { type: "http", url: "https://org.example/team" },
+  });
+  const copilotHome = tempDir("cn-copilot-home-");
+  fs.writeFileSync(path.join(copilotHome, "mcp-config.json"), userConfig);
+  const outside = tempDir("cn-copilot-outside-");
+  const servers = (name) =>
+    JSON.stringify({ mcpServers: { [name]: { command: "x" } } });
+  fs.writeFileSync(path.join(outside, ".mcp.json"), servers("docs"));
+  const repo = path.join(outside, "repo");
+  fs.mkdirSync(path.join(repo, ".git"), { recursive: true });
+  fs.mkdirSync(path.join(repo, ".github"));
+  fs.mkdirSync(path.join(repo, "sub"));
+  fs.writeFileSync(path.join(repo, ".mcp.json"), servers("shared"));
+  fs.writeFileSync(path.join(repo, ".github", "mcp.json"), servers("team"));
+  const record = fakeCopilot(bin);
+  const result = runCn(["copilot"], {
+    env: { ...env, COPILOT_HOME: copilotHome },
+    cwd: path.join(repo, "sub"),
+  });
+  expect(result.status, result.stderr).toBe(0);
+  const args = record().args;
+  const at = args.indexOf("--additional-mcp-config");
+  return at < 0 ? null : Object.keys(JSON.parse(args[at + 1]).mcpServers);
+}
+
+test("cn copilot leaves out org MCP servers the user already names", () => {
+  expect(
+    copilotMcp(JSON.stringify({ mcpServers: { mine: { command: "x" } } })),
+  ).toStrictEqual(["docs"]);
+});
+
+test("a Copilot MCP config that doesn't parse names no servers", () => {
+  expect(copilotMcp("{ not json")).toStrictEqual(["docs", "mine"]);
 });
 
 test("cn copilot resume and continue use Copilot's own flags", () => {
