@@ -58,7 +58,7 @@ with tempfile.TemporaryDirectory(prefix='cn-navigation-') as directory:
         fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 100, 0, 0))
         child.send_signal(signal.SIGWINCH)
         expect('quit')
-        press('\x1b[H' + '\x1b[B' * 5 + '\r')  # Home Cursor desktop
+        press('\x1b[H' + '\x1b[B' * 6 + '\r')  # Home Cursor desktop
         expect('Cursor desktop settings')
         assert 'Default model' not in pending, 'Cursor must choose models in the editor'
         press('\x1b')
@@ -90,7 +90,7 @@ with tempfile.TemporaryDirectory(prefix='cn-navigation-') as directory:
         assert child.poll() is None, 'Cancelling the key prompt closed cn'
         press('\x1b')
         expect('quit')
-        press('\x1b[H' + '\x1b[B' * 7 + '\r')  # Home Configure
+        press('\x1b[H' + '\x1b[B' * 8 + '\r')  # Home Configure
         expect('Configure a tool')
         press('\x1b[F\x1b[A\x1b[A')  # Cursor desktop
         expect("Cursor's servers")
@@ -105,7 +105,7 @@ with tempfile.TemporaryDirectory(prefix='cn-navigation-') as directory:
         expect('Configure a tool')
         press('\x1b')
         expect('quit')
-        press('\x1b[H' + '\x1b[B' * 8 + '\r')  # Home Reset
+        press('\x1b[H' + '\x1b[B' * 9 + '\r')  # Home Reset
         expect('Reset a tool')
         press('\r')  # No managed integration to reset
         expect('Return to the previous menu')

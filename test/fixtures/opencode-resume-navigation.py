@@ -48,7 +48,7 @@ echo OPENCODE_NATIVE_STARTED
         assert text in output, 'Missing ' + repr(text) + ': ' + repr(output[-3000:])
     try:
         expect(b'quit')
-        os.write(master, b'\x1b[H' + b'\x1b[B' * 4 + b'\r')
+        os.write(master, b'\x1b[H' + b'\x1b[B' * 5 + b'\r')
         expect(b'Resume a session')
         assert b'opencode' in output, 'OpenCode missing from tool selector'
         os.write(master, b'\x1b[H' + b'\x1b[B' * 2 + b'\r')

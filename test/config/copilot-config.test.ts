@@ -189,8 +189,8 @@ test("Copilot app key rotation rewrites only cn's provider header", async () => 
     fetched_at: Date.now(),
     models,
   });
-  await configureTool("copilot", f.env);
-  expect(toolConfigured("copilot", f.env)).toBe(true);
+  await configureTool("copilot-app", f.env);
+  expect(toolConfigured("copilot-app", f.env)).toBe(true);
   writeKey("sk-rotated", f.env);
   refreshConfiguredKey(f.env);
   const rows = providers(f);
@@ -208,7 +208,7 @@ test("cn refresh updates Copilot's models, and skips the app without failing whi
     });
   writeKey("sk-saved", f.env);
   catalog(models);
-  await configureTool("copilot", f.env);
+  await configureTool("copilot-app", f.env);
   const ours = () =>
     modelRows(f)
       .filter((row) => row.provider === "Concentrate AI")
@@ -297,7 +297,7 @@ test("Copilot SQL values with quotes round-trip without executing their contents
 });
 
 test.each([
-  ["reset", ["reset", "copilot"]],
+  ["reset", ["reset", "copilot-app"]],
   ["global reset", ["reset", "--yes"]],
   ["logout", ["logout"]],
 ])(
@@ -311,7 +311,7 @@ test.each([
       fetched_at: Date.now(),
       models,
     });
-    const configured = runCn(["configure", "copilot"], { env: f.env });
+    const configured = runCn(["configure", "copilot-app"], { env: f.env });
     expect(configured.status, configured.stderr).toBe(0);
     expect(configured.stdout).toMatch(/Open Copilot and pick a model/);
     expect(configured.stdout).not.toMatch(/sk-saved/);

@@ -1,8 +1,8 @@
 /** Shared contracts between the catalog, commands, and harness adapters. */
 export type Environment = NodeJS.ProcessEnv;
-export type HarnessId = "claude" | "codex" | "opencode" | "pi";
+export type HarnessId = "claude" | "codex" | "opencode" | "pi" | "copilot-cli";
 export type ConfigurableToolId = HarnessId | DesktopAppId;
-export type DesktopAppId = "cursor" | "copilot";
+export type DesktopAppId = "cursor" | "copilot-app";
 export type Preferences = Record<HarnessId, string>;
 // Remote MCP servers an organization adds to every tool, by name.
 export type McpServers = Record<string, { type: "http"; url: string }>;

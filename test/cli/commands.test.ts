@@ -117,7 +117,7 @@ test("setup --models also asks for each tool's default", () => {
   const { config, env } = setup({ CONCENTRATE_API_KEY: "" });
   const result = runCn(["setup", "--no-verify", "--models"], {
     env,
-    input: "sk-piped\n\n\n\n\n",
+    input: "sk-piped\n\n\n\n\n\n",
   });
   expect(result.status, result.stderr).toBe(0);
   expect(result.stdout).toMatch(/Claude Code default model/);

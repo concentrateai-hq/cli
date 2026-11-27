@@ -27,18 +27,24 @@ import { runLauncher, runSettings } from "./launcher.js";
 import { closePrompts } from "./prompt.js";
 import { needsSetup, readStoredKey } from "../config/settings.js";
 import { ledger } from "../ui/layout.js";
-import { interactive } from "../ui/widgets.js";
+import { interactive, select } from "../ui/widgets.js";
 import { changesSince, readChangelog } from "../changelog.js";
 import { offerUpdate, refreshConfiguredTools, runUpdate } from "./update.js";
 import { version } from "../version.js";
 import { runLogin } from "./login.js";
+
+// `cn copilot` runs GitHub Copilot CLI; its tool id names it apart from the app.
+const ALIASES: Record<string, HarnessId> = { copilot: "copilot-cli" };
+const harnessName = (value: string): string => ALIASES[value] ?? value;
+const launchName = (id: HarnessId) =>
+  Object.keys(ALIASES).find((name) => ALIASES[name] === id) ?? id;
 
 const HELP = `cn - Concentrate AI: one key for every coding agent (beta)
 
 Usage:
   cn <tool> [--model <id>] [-- <tool args>]   Launch a tool through Concentrate AI
       tools: ${listHarnesses()
-        .map((h) => h.id)
+        .map((h) => launchName(h.id))
         .join(", ")}
   cn <tool> resume [<session-id>]             Resume a saved local conversation
   cn opencode --session <id>                  Resume an OpenCode conversation
@@ -47,7 +53,8 @@ Usage:
   cn configure <tool>                         Connect a coding tool to Concentrate
   cn reset <tool>                             Remove Concentrate setup from a coding tool
   cn configure cursor                         Connect Cursor desktop (quit Cursor first)
-  cn configure copilot                        Connect the GitHub Copilot app (quit it first)
+  cn configure copilot-cli                    Connect GitHub Copilot CLI (terminal)
+  cn configure copilot-app                    Connect the GitHub Copilot app (desktop; quit it first)
   cn settings                                 Open interactive settings
   cn config                                   Show key status and default models
   cn login [--device] [--new|--rotate]        Sign in and save an API key (--name N, --fresh)
@@ -66,6 +73,37 @@ Usage:
 
 function usageError(message: string) {
   return new CnError(`${message}\nRun cn --help for usage.`, EXIT.USAGE);
+}
+
+// GitHub Copilot is two tools: the CLI and the desktop app.
+async function copilotTarget(
+  operation: "configure" | "reset",
+  env: Environment,
+) {
+  if (!interactive(env))
+    throw usageError(
+      `GitHub Copilot has two setups. Use cn ${operation} copilot-cli for GitHub Copilot CLI (terminal) or cn ${operation} copilot-app for the GitHub Copilot app (desktop).`,
+    );
+  const choice = await select(
+    {
+      title: "Which GitHub Copilot?",
+      items: [
+        {
+          value: "copilot-cli",
+          label: "copilot-cli",
+          note: "GitHub Copilot CLI (terminal)",
+        },
+        {
+          value: "copilot-app",
+          label: "copilot-app",
+          note: "GitHub Copilot app (desktop, macOS)",
+        },
+      ],
+    },
+    env,
+  );
+  if (choice.cancel) throw new CnError("Cancelled.", 130);
+  return choice.value as "copilot-cli" | "copilot-app";
 }
 
 export function parseLaunchArgs(rest: string[]) {
@@ -109,6 +147,14 @@ export function parseHarnessLaunchArgs(target: HarnessId, rest: string[]) {
   if (command === "continue")
     return { ...options, forwarded: ["--continue", ...forwarded] };
   const [id, ...restArgs] = forwarded;
+  if (target === "copilot-cli")
+    return {
+      ...options,
+      forwarded:
+        id && !id.startsWith("-")
+          ? [`--resume=${id}`, ...restArgs]
+          : ["--resume", ...forwarded],
+    };
   if (id && !id.startsWith("-"))
     return { ...options, forwarded: ["--session", id, ...restArgs] };
   if (target === "opencode")
@@ -148,10 +194,11 @@ export function parseFlags(
 }
 
 function toolArg(value: string | undefined): HarnessId | undefined {
+  if (value !== undefined) value = harnessName(value);
   if (value !== undefined && !isHarness(value)) {
     throw usageError(
       `Unknown tool: ${value}. Choose one of: ${listHarnesses()
-        .map((h) => h.id)
+        .map((h) => launchName(h.id))
         .join(", ")}`,
     );
   }
@@ -159,7 +206,8 @@ function toolArg(value: string | undefined): HarnessId | undefined {
 }
 
 async function dispatch(argv: string[], env: Environment) {
-  const [command, ...rest] = argv;
+  const [given, ...rest] = argv;
+  const command = given === undefined ? given : harnessName(given);
   if (command === "--credential-helper") {
     if (rest.length !== 1)
       throw usageError("Invalid credential helper invocation");
@@ -210,7 +258,10 @@ async function dispatch(argv: string[], env: Environment) {
   switch (command) {
     case "configure": {
       const { positionals } = parseFlags(rest);
-      const target = positionals[0];
+      const target =
+        positionals[0] === "copilot" && positionals.length === 1
+          ? await copilotTarget("configure", env)
+          : positionals[0];
       if (!target || !isConfigurableTool(target) || positionals.length !== 1)
         throw usageError("Choose one tool: cn configure <tool>");
       const file = await configureTool(target, env);
@@ -262,7 +313,12 @@ async function dispatch(argv: string[], env: Environment) {
         booleans: ["yes", "sessions"],
       });
       if (positionals.length) {
-        const target = positionals[0];
+        const target =
+          positionals[0] === "copilot" &&
+          positionals.length === 1 &&
+          !flags.sessions
+            ? await copilotTarget("reset", env)
+            : positionals[0];
         if (
           !target ||
           !isConfigurableTool(target) ||

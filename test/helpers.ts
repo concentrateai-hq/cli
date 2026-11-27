@@ -72,10 +72,11 @@ process.exit(${exitCode});
   return () => JSON.parse(fs.readFileSync(record, "utf8"));
 }
 
-export function runCn(args, { env = {}, input } = {}) {
+export function runCn(args, { env = {}, input, cwd } = {}) {
   const result = spawnSync(process.execPath, [BIN, ...args], {
     encoding: "utf8",
     input,
+    cwd,
     env: {
       PATH: path.dirname(process.execPath),
       HOME: tempDir("cn-home-"),

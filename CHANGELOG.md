@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- GitHub Copilot CLI support. `cn copilot` starts Copilot CLI on Concentrate,
+  and `cn configure copilot-cli` makes plain `copilot` list Concentrate models.
+  Claude models use the Anthropic API there, so they're cached.
+- The GitHub Copilot desktop app is now `cn configure copilot-app` and
+  `cn reset copilot-app`, so it can't be mixed up with the CLI. Plain
+  `cn configure copilot` asks which one you mean. Existing app setups keep
+  working.
+
 ## 0.1.6 (2026-11-22)
 
 - `cn login` signs you in with your browser (or a device code over SSH), lets

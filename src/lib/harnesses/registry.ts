@@ -4,9 +4,13 @@ import claude from "./claude.js";
 import codex from "./codex.js";
 import opencode from "./opencode.js";
 import pi from "./pi.js";
+import copilot from "./copilot.js";
 
 const REGISTRY = new Map<HarnessId, Harness>(
-  [claude, codex, opencode, pi].map((adapter) => [adapter.id, adapter]),
+  [claude, codex, opencode, pi, copilot].map((adapter) => [
+    adapter.id,
+    adapter,
+  ]),
 );
 
 export function isHarness(id: string): id is HarnessId {
