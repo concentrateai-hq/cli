@@ -21,6 +21,7 @@ and the coding tools you want to use installed on your `PATH`.
 | Codex                        | OpenAI models only for now. More models coming soon.      |
 | Cursor (desktop)             | Work in progress. Set up with `cn configure cursor`.      |
 | GitHub Copilot app (desktop) | Works (macOS). Set up with `cn configure copilot-app`.    |
+| Zed                          | Works. Set up with `cn configure zed`.                    |
 
 ## Install
 
@@ -152,6 +153,19 @@ The GitHub Copilot desktop app. macOS only for now.
 - The app keeps your key in its local settings database. `cn key` updates it,
   and `cn reset copilot-app` or `cn logout` removes the provider. Providers you added
   yourself are left alone.
+
+## Zed
+
+- `cn configure zed` adds a "Concentrate" provider with the Concentrate models
+  that support tool calls to Zed's agent panel. Zed doesn't need to be closed;
+  pick a model under Concentrate.
+- On macOS, cn saves your key in the keychain, where Zed looks for it. On
+  Linux, set `CONCENTRATE_API_KEY` for Zed or enter the key in Zed's agent
+  settings.
+- Zed asks for prompt caching on every model, so Claude chats are cached too.
+- `cn key` updates the key, and `cn reset zed` or `cn logout` removes the
+  provider. Your other settings, providers, and comments are left alone, and so
+  is a default model you picked yourself.
 
 ## Models
 

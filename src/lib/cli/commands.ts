@@ -446,6 +446,7 @@ export function runLogout(env: Environment = process.env) {
     "copilot-cli",
     "cursor",
     "copilot-app",
+    "zed",
   ] as const) {
     const label = configurableTool(id).label;
     try {

@@ -176,3 +176,37 @@ rewrites its header while the app is closed. Windows and Linux are not supported
 
 Validation covers fixture databases built from the app's schema. A full app
 session through Concentrate has not been tested yet.
+
+## Zed
+
+`cn configure zed` edits Zed's settings file (`~/.config/zed/settings.json` on
+macOS; `$XDG_CONFIG_HOME/zed/settings.json`, or `~/.config/zed`, on Linux) in
+place, keeping comments and formatting. It adds
+`language_models.openai_compatible.Concentrate` with `api_url`
+`https://api.concentrate.ai/v1` and one `available_models` entry per catalog
+model that supports tool calls: the catalog id as `name`, the display name,
+the context size as `max_tokens` (128,000 when unknown), the output limit as
+`max_output_tokens`, and capabilities `tools`, `parallel_tool_calls`, and
+`prompt_cache_key` on, with `images` matching the model. `prompt_cache_key`
+lets Claude reuse its prompt cache between turns. OpenAI models that Codex
+runs set `chat_completions` to false so Zed uses the Responses endpoint; all
+other models, Claude included, use Chat Completions. Reasoning models get a
+`reasoning_effort` (medium when offered, otherwise their lowest level above
+none), which turns on thinking in the agent panel. Reasoning models other than
+Claude and Responses models set `interleaved_reasoning`, so Zed sends their
+earlier thinking back during tool calls.
+When `agent.default_model` is unset, cn sets it to Claude Sonnet under the
+Concentrate provider.
+
+On macOS the key is stored as an internet password with the `api_url` as its
+server and `Bearer` as its account, which is where Zed reads it. cn passes the
+key to `security` on standard input, never on its command line, and lets
+installed Zed apps read it without a prompt. On Linux cn does not write a key:
+Zed reads `CONCENTRATE_API_KEY` from its environment, or you can enter the key
+in Zed's agent settings.
+
+Configure again (or `cn refresh`) replaces the model list. A default model you
+picked in Zed afterward is yours: Configure and Reset leave it alone. Reset,
+Logout, and global Reset remove the provider, the default model if cn set it,
+and the keychain entry if cn created it. `cn key` replaces the keychain copy.
+Zed does not need to be closed for any of these. Windows is not supported.
